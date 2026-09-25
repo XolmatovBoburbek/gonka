@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toon, glow, outlineMaterial, outlineGeometry, normalizeGeometry, softCircleTexture } from '../world/toon.js';
 import { taperedTube, rod } from '../world/geom.js';
 import { mulberry32 } from '../world/sky.js';
-import { instanced, trs } from '../world/props.js';
+import { instanced, trs, rockGeometry } from '../world/props.js';
 
 const OUT = 0x2a1622;
 
@@ -102,7 +102,7 @@ function frondGeometry(start, dir, len, lift, droop, width, segs, rnd) {
   return g;
 }
 
-export function palmGeometry(seed = 1, { height = 9, fronds = 8, segs = 8 } = {}) {
+export function palmGeometry(seed = 1, { height = 9, fronds = 7, segs = 7 } = {}) {
   const rnd = mulberry32(seed * 31 + 7);
   const H = height * (0.9 + rnd() * 0.2);
   const lean = 1.4 + rnd() * 1.8;
@@ -111,7 +111,7 @@ export function palmGeometry(seed = 1, { height = 9, fronds = 8, segs = 8 } = {}
     const t = i / 4;
     pts.push(new THREE.Vector3(lean * t * t, H * t - 0.3 * (1 - t), 0));
   }
-  const trunk = taperedTube(pts, (t) => 0.42 - t * 0.17, 6, 10, false);
+  const trunk = taperedTube(pts, (t) => 0.42 - t * 0.17, 5, 8, false);
   // кольца на стволе
   const uv = trunk.getAttribute('uv');
   const tc = new Float32Array(uv.count * 3);
@@ -137,14 +137,14 @@ export function palmGeometry(seed = 1, { height = 9, fronds = 8, segs = 8 } = {}
   for (let i = 0; i < 2; i++) {
     const a = rnd() * Math.PI * 2;
     const dir = new THREE.Vector3(Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5).normalize();
-    parts.push(frondGeometry(top.clone(), dir, 2.2, 2.2, 0.6, 0.4, 6, rnd));
+    parts.push(frondGeometry(top.clone(), dir, 2.2, 2.2, 0.6, 0.4, 5, rnd));
   }
   const crown = new THREE.IcosahedronGeometry(0.55, 0);
   crown.translate(top.x, top.y - 0.1, top.z);
   parts.push(paint(crown, 0x5a6a2a));
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2 + 0.4;
-    const nut = new THREE.IcosahedronGeometry(0.26, 0);
+    const nut = new THREE.OctahedronGeometry(0.28, 0);
     nut.translate(top.x + Math.cos(a) * 0.38, top.y - 0.45, top.z + Math.sin(a) * 0.38);
     parts.push(paint(nut, 0x6a4424));
   }
@@ -157,7 +157,7 @@ export function makePalms(points, opts = {}) {
   group.name = 'palms';
   const variants = opts.variants ?? 3;
   const geos = [];
-  for (let v = 0; v < variants; v++) geos.push(palmGeometry(v + (opts.seed ?? 0) * 5, { height: 8.5 + v * 0.9, fronds: opts.fronds ?? 8, segs: opts.segs ?? 8 }));
+  for (let v = 0; v < variants; v++) geos.push(palmGeometry(v + (opts.seed ?? 0) * 5, { height: 8.5 + v * 0.9, fronds: opts.fronds ?? 7, segs: opts.segs ?? 7 }));
   const mat = toon(0xffffff, { vertexColors: true, rim: 0.35, rimColor: 0xffc890 });
   const rnd = mulberry32(opts.seed ?? 3);
   const buckets = geos.map(() => []);
@@ -166,7 +166,7 @@ export function makePalms(points, opts = {}) {
     buckets[v].push(trs(p.x, p.y - 0.2, p.z, p.ry ?? rnd() * Math.PI * 2, p.s ?? 0.85 + rnd() * 0.35));
   }
   geos.forEach((g, i) => {
-    group.add(instanced([{ geo: g, mat, outline: opts.outline ? 0.05 : 0, outlineColor: 0x1c2418 }], buckets[i], { name: 'palm-v' + i }));
+    group.add(instanced([{ geo: g, mat, outline: opts.outline ? 0.05 : 0, outlineColor: 0x1c2418 }], buckets[i], { name: 'palm-v' + i, chunk: opts.chunk ?? 300 }));
   });
   return group;
 }
@@ -250,19 +250,15 @@ export function makeLighthouse(opts = {}) {
 
   // домик смотрителя
   const house = new THREE.Group();
-  const hw = [];
   const body = new THREE.BoxGeometry(6, 3.2, 4.4);
   body.translate(0, 1.4, 0);
-  hw.push(body);
-  const door = new THREE.BoxGeometry(1.0, 1.9, 0.2);
-  door.translate(0, 0.9, 2.25);
-  addMesh(house, merge(hw), toon(0xfff1e2, { rim: 0.3, rimColor: 0xffd0a0 }), 0.05);
   const hr = new THREE.CylinderGeometry(0.01, 3.9, 2.0, 4, 1);
   hr.rotateY(Math.PI / 4);
   hr.scale(1.1, 1, 0.82);
   hr.translate(0, 4.0, 0);
-  addMesh(house, hr, toon(0xd8383e, { rim: 0.25 }), 0.05);
-  addMesh(house, door, toon(0x3a6ac8), 0);
+  const door = new THREE.BoxGeometry(1.0, 1.9, 0.2);
+  door.translate(0, 0.9, 2.25);
+  addMesh(house, merge([paint(body, 0xfff1e2), paint(hr, 0xd8383e), paint(door, 0x3a6ac8)], true), toon(0xffffff, { vertexColors: true, rim: 0.3, rimColor: 0xffd0a0 }), 0.05);
   const win = new THREE.BoxGeometry(1.1, 0.9, 0.12);
   win.translate(-1.8, 1.8, 2.22);
   const win2 = win.clone().translate(3.6, 0, 0);
@@ -275,7 +271,7 @@ export function makeLighthouse(opts = {}) {
   const beam = new THREE.Group();
   beam.position.y = lampY;
   const beamMat = new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: new THREE.Color(0xffe6b0).multiplyScalar(0.9) } },
+    uniforms: { uColor: { value: new THREE.Color(0xffe6b0).multiplyScalar(0.6) } },
     vertexShader: /* glsl */ `
       varying float vT;
       varying vec3 vN;
@@ -305,7 +301,7 @@ export function makeLighthouse(opts = {}) {
   });
   const len = opts.beamLength ?? 80;
   for (const s of [1, -1]) {
-    const cone = new THREE.ConeGeometry(7, len, 20, 1, true);
+    const cone = new THREE.ConeGeometry(5, len, 20, 1, true);
     cone.translate(0, -len / 2, 0);
     cone.rotateZ((s * Math.PI) / 2);
     const m = new THREE.Mesh(cone, beamMat);
@@ -356,7 +352,7 @@ export function makeLampPosts(points, opts = {}) {
       { geo: normalizeGeometry(lamp), mat: glow(opts.light ?? 0xffc878, opts.intensity ?? 3.2), shadow: false },
     ],
     mats,
-    { name: 'lamps' }
+    { name: 'lamps', chunk: 300 }
   );
 }
 
@@ -466,36 +462,81 @@ export function makeUmbrellas(points, opts = {}) {
   return group;
 }
 
-export function makeLifeguardTower(opts = {}) {
+export function makeLifeguardTower() {
   const group = new THREE.Group();
   group.name = 'lifeguard';
-  const wood = [];
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) wood.push(rod([sx * 1.4, 0, sz * 1.4], [sx * 1.0, 3.2, sz * 1.0], 0.13, 0.13, 5));
-  wood.push(rod([-1.2, 1.4, 1.2], [1.2, 1.4, 1.2], 0.08, 0.08, 4));
-  wood.push(rod([-1.2, 1.4, -1.2], [1.2, 1.4, -1.2], 0.08, 0.08, 4));
+  const parts = [];
+  const wood = (g) => parts.push(paint(g, 0xf4ecdc));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) wood(rod([sx * 1.4, 0, sz * 1.4], [sx * 1.0, 3.2, sz * 1.0], 0.13, 0.13, 5));
+  wood(rod([-1.2, 1.4, 1.2], [1.2, 1.4, 1.2], 0.08, 0.08, 4));
+  wood(rod([-1.2, 1.4, -1.2], [1.2, 1.4, -1.2], 0.08, 0.08, 4));
   // лестница
-  for (let i = 0; i < 6; i++) wood.push(rod([-0.5, i * 0.55, 2.4 - i * 0.2], [0.5, i * 0.55, 2.4 - i * 0.2], 0.06, 0.06, 4));
-  wood.push(rod([-0.55, 0, 2.5], [-0.55, 3.2, 1.2], 0.07, 0.07, 4), rod([0.55, 0, 2.5], [0.55, 3.2, 1.2], 0.07, 0.07, 4));
+  for (let i = 0; i < 6; i++) wood(rod([-0.5, i * 0.55, 2.4 - i * 0.2], [0.5, i * 0.55, 2.4 - i * 0.2], 0.06, 0.06, 4));
+  wood(rod([-0.55, 0, 2.5], [-0.55, 3.2, 1.2], 0.07, 0.07, 4));
+  wood(rod([0.55, 0, 2.5], [0.55, 3.2, 1.2], 0.07, 0.07, 4));
   const floor = new THREE.BoxGeometry(2.8, 0.25, 2.8);
   floor.translate(0, 3.3, 0);
-  wood.push(floor);
-  addMesh(group, merge(wood), toon(0xf4ecdc, { rim: 0.3 }), 0.035);
+  wood(floor);
   const cabin = new THREE.BoxGeometry(2.4, 1.1, 2.4);
   cabin.translate(0, 3.95, 0);
-  addMesh(group, cabin, toon(0xe8423a, { rim: 0.3 }), 0.04);
+  parts.push(paint(cabin, 0xe8423a));
   const roof = new THREE.CylinderGeometry(0.01, 2.4, 1.1, 4, 1);
   roof.rotateY(Math.PI / 4);
   roof.translate(0, 5.6, 0);
-  const posts = [];
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) posts.push(rod([sx * 1.1, 4.4, sz * 1.1], [sx * 1.1, 5.1, sz * 1.1], 0.06, 0.06, 4));
-  addMesh(group, merge([roof, ...posts]), toon(0xfff4e8), 0.04);
-  const pole = rod([1.3, 5.0, -1.3], [1.3, 8.0, -1.3], 0.05, 0.05, 4);
-  addMesh(group, pole, toon(0xdddddd));
-  const flag = new THREE.PlaneGeometry(1.4, 0.8);
+  parts.push(paint(roof, 0xfff4e8));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) wood(rod([sx * 1.1, 4.4, sz * 1.1], [sx * 1.1, 5.1, sz * 1.1], 0.06, 0.06, 4));
+  parts.push(paint(rod([1.3, 5.0, -1.3], [1.3, 8.0, -1.3], 0.05, 0.05, 4), 0xdddddd));
+  const flag = new THREE.BoxGeometry(1.4, 0.8, 0.04);
   flag.translate(2.0, 7.6, -1.3);
-  const fm = new THREE.Mesh(flag, toon(0xffd02a, { side: THREE.DoubleSide }));
-  group.add(fm);
+  parts.push(paint(flag, 0xffd02a));
+  addMesh(group, merge(parts, true), toon(0xffffff, { vertexColors: true, rim: 0.3, rimColor: 0xffd0a0 }), 0.035);
   return group;
+}
+
+// ------------------------------------------------------------------ камни (крупные чанки — меньше draw calls)
+export function makeRocks(points, opts = {}) {
+  const geo = normalizeGeometry(rockGeometry(opts.seed ?? 4, 1));
+  const rnd = mulberry32(opts.seed ?? 4);
+  const mats = points.map((p) => {
+    const s = p.s ?? 1 + rnd() * 2;
+    const sy = p.sy ?? 1;
+    return trs(p.x, p.y, p.z, rnd() * 6.28, new THREE.Vector3(s * (0.8 + rnd() * 0.5), s * sy * (0.6 + rnd() * 0.5), s * (0.8 + rnd() * 0.5)));
+  });
+  return instanced([{ geo, mat: toon(opts.color ?? 0x9a948e, { rim: 0.25, rimColor: 0xffb080 }), outline: opts.outline ?? 0.05, outlineColor: 0x2a2024 }], mats, { name: 'rocks', receiveShadow: true, chunk: 420 });
+}
+
+// ------------------------------------------------------------------ цветы гибискуса (одна деталь, крупные чанки)
+export function makeHibiscus(points, palette = [0xff4a6a, 0xffd84a, 0xff8ac0, 0xffffff, 0xff7a3a], opts = {}) {
+  const parts = [];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const p = new THREE.CircleGeometry(0.2, 5);
+    p.rotateX(-Math.PI / 2 + 0.35);
+    p.rotateY(-a + Math.PI / 2);
+    p.translate(Math.cos(a) * 0.2, 0.5, Math.sin(a) * 0.2);
+    parts.push(paint(p, 0xffffff));
+  }
+  const center = new THREE.CircleGeometry(0.08, 5);
+  center.rotateX(-Math.PI / 2);
+  center.translate(0, 0.53, 0);
+  parts.push(paint(center, 0xffe27a));
+  const stem = new THREE.CylinderGeometry(0.025, 0.025, 0.5, 3);
+  stem.translate(0, 0.25, 0);
+  parts.push(paint(stem, 0x4a8a3a));
+  const leaf = new THREE.CircleGeometry(0.16, 4);
+  leaf.rotateX(-Math.PI / 2 + 0.5);
+  leaf.translate(0.12, 0.22, 0);
+  parts.push(paint(leaf, 0x4a8a3a));
+  const rnd = mulberry32(opts.seed ?? 13);
+  const mats = points.map((p) => trs(p.x, p.y, p.z, rnd() * 6.28, 0.8 + rnd() * 0.7));
+  const cols = points.map(() => new THREE.Color(palette[Math.floor(rnd() * palette.length)]));
+  // белые лепестки тонируются цветом инстанса; стебель и серединка остаются тёмными/жёлтыми за счёт вершинных цветов
+  return instanced([{ geo: merge(parts, true), mat: toon(0xffffff, { vertexColors: true, side: THREE.DoubleSide, ramp: 'soft' }), tint: true, shadow: false }], mats, {
+    colors: cols,
+    castShadow: false,
+    name: 'flowers',
+    chunk: 420,
+  });
 }
 
 // ------------------------------------------------------------------ дома на холмах
@@ -786,7 +827,7 @@ const lanternVert = /* glsl */ `
     vec4 mvPosition = viewMatrix * vec4(wp + local, 1.0);
     float edge = max(abs(p.x), abs(p.y)) / (uBox.x * 0.5);
     vAlpha = (1.0 - smoothstep(0.8, 1.0, edge)) * smoothstep(0.0, 0.08, hy / uBox.y) * (1.0 - smoothstep(0.75, 1.0, hy / uBox.y));
-    vAlpha *= smoothstep(3.0, 9.0, length(wp - uCam));
+    vAlpha *= smoothstep(7.0, 16.0, length(wp - uCam));
     gl_Position = projectionMatrix * mvPosition;
     #include <fog_vertex>
   }

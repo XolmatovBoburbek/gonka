@@ -7,9 +7,11 @@ import { buildTerrain } from '../world/terrain.js';
 import { createWater } from '../world/water.js';
 import { createNoise2D, fbm, smoothstep, lerp } from '../world/noise.js';
 import { toon } from '../world/toon.js';
-import { makeRocks, makeGrass, makeFlowers, makeBushes, scatterAround } from '../world/props.js';
+import { makeGrass, makeBushes, scatterAround } from '../world/props.js';
 import {
   makePalms,
+  makeRocks,
+  makeHibiscus,
   makeLighthouse,
   makePilings,
   makeLampPosts,
@@ -171,7 +173,7 @@ export const sunset = {
   ],
   ramps: [{ at: 0.575, lateral: -3.5, width: 8, length: 8, height: 1.4 }],
   theme: {
-    road: { base: '#6a6275', grain: 0.09, edgeLine: '#fff4e8', centerLine: '#ffd27a' },
+    road: { base: '#857a86', grain: 0.09, edgeLine: '#fff4e8', centerLine: '#ffd27a' },
     curb: { a: '#ff5e62', b: '#fff4e6', width: 1.5 },
     wall: { style: 'guard', a: '#fff4ea', b: '#8a5a3e', height: 0.95 },
     deck: { color: 0xb88a62, side: 0x6e4c38, depth: 1.6 },
@@ -193,15 +195,14 @@ export const sunset = {
     const sunDir = new THREE.Vector3(-0.56, 0.075, 0.83).normalize();
     const lightDir = new THREE.Vector3(-0.56, 0.36, 0.83).normalize();
     const updaters = [];
-    let __t = performance.now(); const __m = (n) => { const t = performance.now(); console.log('[sunset] ' + n + ' ' + (t - __t).toFixed(0)); __t = t; };
 
     // --- небо, туман, свет
     const sky = createSky({
-      top: 0x1c2466,
-      mid: 0xb05c9c,
-      horizon: 0xff9c6a,
+      top: 0x2e3494,
+      mid: 0xe0748c,
+      horizon: 0xffa468,
       bottom: FOG,
-      midPos: 0.3,
+      midPos: 0.13,
       sunDir,
       sunColor: 0xffe2a0,
       sunBright: 3.4,
@@ -211,8 +212,8 @@ export const sunset = {
       horizonGlow: 0.75,
       cloudCover: 0.34,
       cloudScale: 0.95,
-      cloudLight: 0xffb08a,
-      cloudShade: 0x6e4a8e,
+      cloudLight: 0xffc4a0,
+      cloudShade: 0xb07aa8,
       cloudRim: 0xffe0a0,
       cloudOpacity: 0.95,
     });
@@ -230,7 +231,6 @@ export const sunset = {
       shadowExtent: 80,
     });
 
-    __m('// --- рельеф');
     // --- рельеф
     const center = track.bounds.getCenter(new THREE.Vector3());
     const SIZE = 1500;
@@ -239,15 +239,16 @@ export const sunset = {
     const nB = createNoise2D(77);
     const nC = createNoise2D(5);
     const hills = (x, z) => {
-      const north = smoothstep(30, -320, z);
+      const north = smoothstep(20, -330, z);
       const far = smoothstep(-400, -1300, z);
-      return Math.max(-1, 4 + fbm(nA, x / 160, z / 160, 4) * 6 + north * (20 + fbm(nB, x / 90, z / 90, 3) * 12) + far * 50);
+      const ridge = 1 - Math.abs(fbm(nB, x / 260 + 7, z / 200, 3));
+      return Math.max(-1, 4 + fbm(nA, x / 150, z / 150, 3) * 9 + north * (24 + ridge * ridge * 36 + fbm(nB, x / 120, z / 120, 2) * 10) + far * 60);
     };
     // обрывы на мысе и восточном берегу, пляж — на остальном
     const cliffK = (x) => smoothstep(132, 160, x) * (1 - smoothstep(420, 560, x));
     const cap = (x, sd) => {
-      const beach = sd >= 0 ? 0.3 + sd * 0.07 : 0.3 + sd * 0.09;
-      const rock = sd >= 0 ? -2.5 + sd * 1.4 : -2.5 + sd * 0.35;
+      const beach = sd >= 0 ? 0.3 + sd * 0.07 + smoothstep(30, 100, sd) * 200 : sd > -5 ? 0.3 + sd * 0.32 : -1.3 + (sd + 5) * 0.085;
+      const rock = sd >= 0 ? -3 + sd * 2.1 : -3 + sd * 0.35;
       return Math.max(-16, lerp(beach, rock, cliffK(x)));
     };
     let lastX = NaN;
@@ -264,15 +265,17 @@ export const sunset = {
     const heightFn = (x, z) => {
       const r = road(x, z);
       const t = smoothstep(14, 120, r.d);
-      let h = r.y + t * hills(x, z);
-      // невысокие дюны у пляжа
       const sd = sdAt(x, z);
-      h = Math.min(h, cap(x, sd));
-      return h;
+      return Math.min(r.y + t * hills(x, z), cap(x, sd)) + dune(x, z, sd);
+    };
+    // невысокие песчаные дюны на пляже
+    const dune = (x, z, sd) => {
+      const k = (1 - cliffK(x)) * smoothstep(5, 12, sd) * (1 - smoothstep(20, 28, sd));
+      return k > 0 ? k * Math.max(0, fbm(nC, x / 16, z / 16, 2)) * 1.8 : 0;
     };
     const post = (x, z, h, roadK) => {
-      const c = cap(x, sdAt(x, z));
-      return lerp(Math.min(h, c), h, roadK);
+      const sd = sdAt(x, z);
+      return lerp(Math.min(h, cap(x, sd) + dune(x, z, sd)), h, roadK);
     };
     const cSand = new THREE.Color(0xf4d8a6);
     const cSandWet = new THREE.Color(0xc89e78);
@@ -294,7 +297,7 @@ export const sunset = {
       const sand = (1 - ck) * (1 - smoothstep(26, 34, sd + n * 4));
       c.lerp(cSand, sand);
       // скалы на крутых склонах
-      const rock = THREE.MathUtils.clamp((info.slope - 0.2) * 3.2, 0, 1) * (0.4 + 0.6 * ck);
+      const rock = THREE.MathUtils.clamp((info.slope - 0.14) * 4, 0, 1) * (0.35 + 0.65 * ck);
       c.lerp(n > 0 ? cRock : cRockDark, rock);
       if (sd < 3) c.lerp(ck > 0.5 ? cRockDark : cSandWet, THREE.MathUtils.clamp((3 - sd) / 3, 0, 1) * 0.8);
       return c;
@@ -308,12 +311,10 @@ export const sunset = {
       color: colorFn,
       blendOuter: 36,
     });
-    __m('scene.add(terrain.me');
     scene.add(terrain.mesh);
     const H = terrain.heightAt;
     scene.add(buildFarTerrain(center, SIZE, heightFn, colorFn));
 
-    __m('// --- океан');
     // --- океан
     const water = createWater({
       size: 6400,
@@ -323,18 +324,17 @@ export const sunset = {
       deep: 0x2a3a86,
       shallow: 0x3cc4bc,
       foam: 0xfff0e0,
-      sky: 0xffa48c,
+      sky: 0xe08a9c,
       sunDir,
-      sunColor: 0xffd08a,
+      sunColor: 0xffc070,
       heightMap: terrain.heightTexture(),
       wave: 0.08,
-      sparkle: 1.3,
-      sunPath: 1.7,
+      sparkle: 0.9,
+      sunPath: 1.05,
     });
     scene.add(water);
     updaters.push(water.userData.update);
 
-    __m('// --- горизонт');
     // --- горизонт: горы на севере, острова и облака
     const north = [Math.PI * 0.94, Math.PI * 2.06];
     const ring1 = createMountainRing({ radius: 1250, height: 150, baseY: -6, color: 0x6e4f86, topColor: 0x8e62a0, seed: 6, peaks: 9, fogColor: FOG, fogAmount: 0.45, arc: north });
@@ -353,7 +353,7 @@ export const sunset = {
       { low: 0x9a5a86, high: 0xc07a96 }
     );
     scene.add(islands);
-    const clouds = createCumulus({ count: 16, radius: 1350, radiusJitter: 250, minY: 110, maxY: 240, scale: [70, 150], color: 0xffc4a4, shade: 0x8a5a9a, seed: 5, tint: { color: 0xff9a7a, amount: 0.25 } });
+    const clouds = createCumulus({ count: 9, radius: 1750, radiusJitter: 200, minY: 90, maxY: 170, scale: [150, 260], arc: [Math.PI * 1.08, Math.PI * 1.92], color: 0xffc4a4, shade: 0x8a5a9a, seed: 5, tint: { color: 0xff9a7a, amount: 0.25 } });
     clouds.position.set(center.x, 0, center.z);
     scene.add(clouds);
 
@@ -370,7 +370,6 @@ export const sunset = {
     scene.add(sb.mesh);
     updaters.push(sb.update);
 
-    __m('// --- ориентиры');
     // --- ориентиры вдоль трассы
     const fr = {};
     const frameAt = (f) => track.frameAtProgress((((f % 1) + 1) % 1) * L, fr);
@@ -396,13 +395,15 @@ export const sunset = {
       const d = track.hw[tipI] + track.wall[tipI] + 9;
       const lx = P.x + R.x * side * d;
       const lz = P.z + R.z * side * d;
-      const lh = makeLighthouse({ housePos: { x: -9, z: -2 }, houseRot: Math.atan2(R.x * side, R.z * side) });
+      const T = track.tan[tipI];
+      const ox = R.x * side;
+      const oz = R.z * side;
+      const lh = makeLighthouse({ height: 22, housePos: { x: T.x * 10 + ox * 1.5, z: T.z * 10 + oz * 1.5 }, houseRot: Math.atan2(-ox, -oz) });
       lh.group.position.set(lx, H(lx, lz) - 0.4, lz);
       scene.add(lh.group);
       updaters.push(lh.update);
     }
 
-    __m('// --- пальмы');
     // --- пальмы
     const palms = [];
     const addRow = (f0, f1, step, off, jitter, sides = [-1, 1], lean = null) => {
@@ -418,18 +419,18 @@ export const sunset = {
       }
     };
     // бульвар (старт/финиш) — ровные ряды, пальмы клонятся от дороги
-    addRow(0.84, 1.0, 13, 2.8, 1.2);
-    addRow(0.0, 0.1, 13, 2.8, 1.2);
+    addRow(0.84, 1.0, 15, 2.8, 1.2);
+    addRow(0.0, 0.1, 15, 2.8, 1.2);
     // пляжная дорога — со стороны моря, наклон к морю
     addRow(0.45, 0.63, 17, 4, 6, [-1, 1], -Math.PI / 2);
     addRow(0.75, 0.84, 20, 4, 8);
-    const scattered = scatterAround(track, H, { count: Math.round(110 * detail), minDist: 6, maxDist: 70, seed: 4, avoid: (x, z) => coast.signed(x, z) < 5 || cliffK(x) > 0.5 });
+    const scattered = scatterAround(track, H, { count: Math.round(95 * detail), minDist: 6, maxDist: 70, seed: 4, avoid: (x, z) => coast.signed(x, z) < 5 || cliffK(x) > 0.5 });
     for (const p of scattered) palms.push({ x: p.x, y: p.y, z: p.z });
-    scene.add(makePalms(palms, { outline, seed: 1 }));
+    scene.add(makePalms(palms, { outline, seed: 1, variants: 2 }));
     const farPalms = scatterAround(track, H, { count: Math.round(120 * detail), minDist: 75, maxDist: 230, seed: 8, avoid: (x, z) => coast.signed(x, z) < 5 });
-    scene.add(makePalms(farPalms.map((p) => ({ x: p.x, y: p.y, z: p.z, s: 1 + Math.random() * 0.4 })), { outline: false, seed: 2, fronds: 7, segs: 6, variants: 2 }));
+    const rfp = mulberry32(12);
+    scene.add(makePalms(farPalms.map((p) => ({ x: p.x, y: p.y, z: p.z, s: 1 + rfp() * 0.4 })), { outline: false, seed: 2, fronds: 6, segs: 5, variants: 2, chunk: 420 }));
 
-    __m('// --- пирс');
     // --- пирс: сваи, фонари, гирлянды
     const bridgeRanges = track.ranges((i) => (track.flags[i] & 1) !== 0);
     const pilings = [];
@@ -486,7 +487,6 @@ export const sunset = {
     }
     scene.add(makeStringLights(pairs, { spacing: 1.5, sag: 1.1 }));
 
-    __m('// --- пляж');
     // --- пляж: домики, зонтики, вышка спасателей
     const huts = [];
     const umbrellas = [];
@@ -522,7 +522,6 @@ export const sunset = {
       scene.add(tower);
     }
 
-    __m('// --- дома');
     // --- дома на холмах
     const houses = scatterAround(track, H, {
       count: Math.round(26 * Math.max(0.6, detail)),
@@ -538,45 +537,46 @@ export const sunset = {
       )
     );
 
-    __m('// --- скалы');
     // --- скалы: подножие обрывов и кекуры в море
     const rocks = [];
     const rr = mulberry32(8);
-    for (let i = 0; i < 900 && rocks.length < 150 * detail; i++) {
+    for (let i = 0; i < 1200 && rocks.length < 170 * detail; i++) {
       const p = coastPts[Math.floor(rr() * coastPts.length)];
-      if (cliffK(p.x) < 0.5 && rr() < 0.8) continue;
+      const ck = cliffK(p.x);
+      if (ck < 0.5 && rr() < 0.9) continue;
       if (Math.abs(p.x - center.x) > 600) continue;
-      const x = p.x + (rr() - 0.5) * 16;
-      const z = p.z + (rr() - 0.5) * 16;
+      const x = p.x + (rr() - 0.5) * 8;
+      const z = p.z + (rr() - 0.5) * 8;
       if (!clearOfRoad(x, z, 3)) continue;
-      const big = rr() < 0.15;
-      rocks.push({ x, y: H(x, z) - 0.6, z, s: big ? 3 + rr() * 3 : 1 + rr() * 2 });
+      const s = ck < 0.5 ? 0.6 + rr() * 0.8 : rr() < 0.15 ? 3 + rr() * 1.5 : 1.2 + rr() * 1.8;
+      rocks.push({ x, y: H(x, z) - 0.5, z, s, sy: ck < 0.5 ? 0.8 : 1 + rr() * 0.6 });
     }
     // кекуры у мыса
-    for (const [dx, dz, s] of [
-      [30, 70, 7],
-      [55, 58, 5],
-      [-35, 80, 6],
-      [90, 25, 8],
-      [-60, 64, 4],
+    for (const [dx, dz, s, sy] of [
+      [30, 70, 5, 2.4],
+      [55, 58, 3.5, 2],
+      [-35, 80, 4.5, 2.8],
+      [90, 25, 6, 2],
+      [-60, 64, 3, 1.6],
+      [70, 90, 2.5, 1.5],
     ]) {
       const P = track.pos[tipI];
-      rocks.push({ x: P.x + dx, y: -3, z: P.z + dz, s });
+      const x = P.x + dx;
+      const z = P.z + dz;
+      rocks.push({ x, y: Math.min(-2, H(x, z)), z, s, sy });
     }
     const inland = scatterAround(track, H, { count: Math.round(50 * detail), minDist: 8, maxDist: 110, seed: 23, avoid: (x, z) => coast.signed(x, z) < 20 });
-    for (const p of inland) rocks.push({ x: p.x, y: p.y - 0.3, z: p.z });
+    for (const p of inland) rocks.push({ x: p.x, y: p.y - 0.3, z: p.z, s: 0.8 + rr() * 1.2 });
     scene.add(makeRocks(rocks, { color: 0xb49488 }));
 
-    __m('// --- трава');
     // --- трава, кусты, цветы
     const grass = scatterAround(track, H, { count: Math.round(1500 * detail), minDist: 0.5, maxDist: 42, seed: 31, avoid: (x, z) => coast.signed(x, z) < 12 });
     scene.add(makeGrass(grass, { low: 0x5a7a3a, high: 0xd8c878 }));
     const flowers = scatterAround(track, H, { count: Math.round(700 * detail), minDist: 1, maxDist: 45, seed: 41, avoid: (x, z) => coast.signed(x, z) < 30 });
-    scene.add(makeFlowers(flowers, [0xff4a6a, 0xffd84a, 0xff8ac0, 0xffffff, 0xff7a3a]));
-    const bushes = scatterAround(track, H, { count: Math.round(110 * detail), minDist: 2, maxDist: 40, seed: 51, avoid: (x, z) => coast.signed(x, z) < 22 });
+    scene.add(makeHibiscus(flowers));
+    const bushes = scatterAround(track, H, { count: Math.round(75 * detail), minDist: 2, maxDist: 40, seed: 51, avoid: (x, z) => coast.signed(x, z) < 22 });
     scene.add(makeBushes(bushes, { outline, low: 0x3a6a3a, high: 0x8ab85a }));
 
-    __m('// --- колесо');
     // --- колесо обозрения на западном мысу
     {
       const x = center.x - 420;
@@ -588,7 +588,6 @@ export const sunset = {
       updaters.push(fw.update);
     }
 
-    __m('// --- чайки');
     // --- чайки
     const tip = track.pos[tipI];
     const gulls = makeSeagulls([
@@ -600,7 +599,6 @@ export const sunset = {
     scene.add(gulls.mesh);
     updaters.push(gulls.update);
 
-    __m('// --- небесные');
     // --- небесные фонарики: дальнее поле + рядом с камерой (ambient)
     const farLanterns = createSkyLanterns({ count: Math.round(320 * (quality.particles ?? 1)), box: [900, 210, 900], baseY: 12, size: 1.9, rise: 1.1, glow: 2.6, seed: 3 });
     scene.add(farLanterns);
@@ -611,7 +609,6 @@ export const sunset = {
     scene.add(near);
     updaters.push(near.userData.update);
 
-    __m('return {\n      sky,');
     return {
       sky,
       lights,
@@ -619,7 +616,7 @@ export const sunset = {
       ambient: near,
       ambientCount,
       dustColor: new THREE.Color(0xe8c89a),
-      bloom: { strength: 0.6, radius: 0.6, threshold: 1.15 },
+      bloom: { strength: 0.5, radius: 0.6, threshold: 1.2 },
       exposure: 1.0,
       post: { saturation: 1.1, vignette: 0.3 },
       minimap: { road: '#ffffff', edge: '#ff7a3c', bg: 'rgba(255,226,206,0.35)' },
