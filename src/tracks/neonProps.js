@@ -711,7 +711,7 @@ export function instancedParts(parts, matrices, { colors = null, name = 'parts' 
     im.computeBoundingSphere();
     group.add(im);
     if (p.outline) {
-      const om = new THREE.InstancedMesh(p.outlineGeo || outlineGeometry(p.geo), outlineMaterial(p.outlineColor ?? 0x140a20, p.outline), matrices.length);
+      const om = new THREE.InstancedMesh(p.outlineGeo || outlineGeometry(p.geo), outlineMaterial(p.outlineColor ?? 0x140a20, p.outline, { instanced: true }), matrices.length);
       om.instanceMatrix = im.instanceMatrix;
       om.castShadow = false;
       om.computeBoundingSphere();
@@ -972,7 +972,7 @@ export function makeTrain(a, b, { cars = 7, speed = 26, outline = true } = {}) {
     group.add(im);
     meshes.push(im);
     if (ol) {
-      const om = new THREE.InstancedMesh(outlineGeometry(g), outlineMaterial(0x141020, 0.07), n);
+      const om = new THREE.InstancedMesh(outlineGeometry(g), outlineMaterial(0x141020, 0.07, { instanced: true }), n);
       om.instanceMatrix = im.instanceMatrix;
       om.frustumCulled = false;
       group.add(om);

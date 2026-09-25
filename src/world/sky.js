@@ -200,7 +200,8 @@ export function createLights(scene, opts = {}) {
   const sunDir = (opts.sunDir || new THREE.Vector3(0.3, 0.6, -0.7)).clone().normalize();
   sun.userData.dir = sunDir;
   sun.castShadow = true;
-  const s = opts.shadowExtent ?? 70;
+  // коробка теней меньше shadowExtent (тексели плотнее), зато сдвинута вперёд по взгляду камеры (см. follow)
+  const s = (opts.shadowExtent ?? 70) * 0.72;
   sun.shadow.camera.left = -s;
   sun.shadow.camera.right = s;
   sun.shadow.camera.top = s;
@@ -213,11 +214,23 @@ export function createLights(scene, opts = {}) {
   scene.add(sun);
   scene.add(sun.target);
   const lights = { hemi, sun, sunDir };
-  lights.follow = (target) => {
+  const fwd = new THREE.Vector3();
+  lights.follow = (target, camera) => {
+    // центр коробки — впереди по взгляду камеры: позади неё тени не видны
+    let x = target.x;
+    let z = target.z;
+    if (camera) {
+      camera.getWorldDirection(fwd);
+      const l = Math.hypot(fwd.x, fwd.z);
+      if (l > 1e-4) {
+        x += (fwd.x / l) * 0.4 * s;
+        z += (fwd.z / l) * 0.4 * s;
+      }
+    }
     // привязка к сетке текселей тени убирает "мерцание" краёв теней
     const texel = (2 * s) / sun.shadow.mapSize.x;
-    const tx = Math.round(target.x / texel) * texel;
-    const tz = Math.round(target.z / texel) * texel;
+    const tx = Math.round(x / texel) * texel;
+    const tz = Math.round(z / texel) * texel;
     sun.target.position.set(tx, target.y, tz);
     sun.position.set(tx + sunDir.x * 200, target.y + sunDir.y * 200, tz + sunDir.z * 200);
   };

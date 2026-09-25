@@ -84,9 +84,13 @@ export function addRim(mat, strength = 0.5, color = 0xffffff, lo = 0.62, hi = 0.
 
 const outlineMatCache = new Map();
 
-/** Материал контура: задние грани, раздутые по нормали. */
+/**
+ * Материал контура: задние грани, раздутые по нормали.
+ * opts.instanced — отдельный экземпляр для InstancedMesh: для общего с обычными мешами материала
+ * three.js заново выбирает программу (getProgram) при каждой смене инстансы ↔ меш, каждый кадр.
+ */
 export function outlineMaterial(color = 0x1c1024, thickness = 0.035, opts = {}) {
-  const key = `${color}_${thickness}_${opts.fog ?? true}`;
+  const key = `${color}_${thickness}_${opts.fog ?? true}_${!!opts.instanced}`;
   if (outlineMatCache.has(key)) return outlineMatCache.get(key);
   const mat = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide, fog: opts.fog ?? true });
   const uniforms = { uOutline: { value: thickness } };
@@ -115,7 +119,7 @@ export function outlineGeometry(geometry) {
 /** Добавляет контур к мешу (или InstancedMesh) и возвращает его. */
 export function addOutline(mesh, thickness = 0.035, color = 0x1c1024, opts = {}) {
   const geo = opts.sharedGeometry || outlineGeometry(mesh.geometry);
-  const mat = outlineMaterial(color, thickness, opts);
+  const mat = outlineMaterial(color, thickness, { ...opts, instanced: !!mesh.isInstancedMesh });
   let outline;
   if (mesh.isInstancedMesh) {
     outline = new THREE.InstancedMesh(geo, mat, mesh.count);

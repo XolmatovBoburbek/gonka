@@ -59,7 +59,7 @@ export function instanced(parts, matrices, { colors = null, castShadow = true, r
       im.computeBoundingSphere();
       group.add(im);
       if (p.outline) {
-        const om = new THREE.InstancedMesh(outlineGeos[pi], outlineMaterial(p.outlineColor ?? OUT, p.outline), idx.length);
+        const om = new THREE.InstancedMesh(outlineGeos[pi], outlineMaterial(p.outlineColor ?? OUT, p.outline, { instanced: true }), idx.length);
         om.instanceMatrix = im.instanceMatrix;
         om.castShadow = false;
         om.computeBoundingSphere();
@@ -143,7 +143,7 @@ export function makeSakuraForest(points, opts = {}) {
           { geo: v.canopy, mat: canopyMat, tint: true, outline: opts.outline ? 0.08 : 0, outlineColor: 0x7a2a52 },
         ],
         buckets[i],
-        { colors: tints[i], name: 'sakura-v' + i, chunk: 240 }
+        { colors: tints[i], name: 'sakura-v' + i, chunk: 170 }
       )
     );
   });
