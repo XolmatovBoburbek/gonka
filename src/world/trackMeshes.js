@@ -537,7 +537,7 @@ export function rampHeightAt(zone, t) {
 export function buildStartGate(track, opts = {}) {
   const group = new THREE.Group();
   const fr = track.frameAt(0, {});
-  const half = fr.hw + Math.min(fr.wall, 3) + 1.2;
+  const half = fr.hw + fr.wall + 1.2; // столбы — за стеной: машинки (и камера) не проезжают сквозь них
   const height = opts.height ?? 8.5;
   const pillarMat = toon(opts.pillar ?? 0xffffff, { rim: 0.25 });
   const accentMat = toon(opts.accent ?? 0xff5d93);

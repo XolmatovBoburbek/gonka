@@ -22,6 +22,16 @@ export class CameraRig {
     this.lookBack = false;
     this.orbitAngle = 0;
     this.distScale = 1;
+    this.track = null; // если задана — камера не выходит за стены трассы
+    this._pr = {};
+  }
+
+  /** За стенами стоят щиты, столбы и опоры: камера внутри них закрывает экран тёмной плитой. */
+  _keepInTrack(kart) {
+    if (!this.track) return;
+    const pr = this.track.project(this.pos, kart.trackIdx, this._pr);
+    const lim = pr.hw + pr.wall - 0.9;
+    if (Math.abs(pr.lateral) > lim) this.pos.addScaledVector(pr.right, Math.sign(pr.lateral) * lim - pr.lateral);
   }
 
   shake(amount) {
@@ -52,6 +62,7 @@ export class CameraRig {
     this.pos.lerp(desired, kp);
     // не опускаться ниже карта
     if (this.pos.y < kart.pos.y + 1.1) this.pos.y = kart.pos.y + 1.1;
+    this._keepInTrack(kart);
     const lookT = new THREE.Vector3().copy(kart.pos).addScaledVector(fwd, 4.5 * dir);
     lookT.y = kart.pos.y + 1.25;
     this.look.lerp(lookT, this.lookBack ? 1 : 1 - Math.exp(-dt * 14));

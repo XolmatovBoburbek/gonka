@@ -13,16 +13,41 @@ export const QUALITY_PRESETS = {
   high: { label: 'Высокое', pixelBudget: 3.7e6, maxPixelRatio: 2, shadows: true, shadowSize: 2048, post: true, bloom: true, bloomScale: 1, msaa: 4, particles: 1, detail: 1 },
 };
 
-// NaN/Inf из HDR-буфера bloom размазал бы на весь экран чёрным пятном — такие пиксели обнуляем на входе.
-const SAFE_TEXEL = /* glsl */ `vec4 texel = texture2D( tDiffuse, vUv );
-			if ( any( isnan( texel ) ) || any( isinf( texel ) ) ) texel = vec4( 0.0 );`;
+// Выделение ярких мест для bloom: 4 отсчёта (при уменьшенном bloom иначе тонкие неоновые линии мерцали бы —
+// попадали бы в пропущенные пиксели), порог — на каждый отсчёт. NaN/Inf из HDR-буфера bloom размазал бы
+// на весь экран чёрным пятном — такие отсчёты обнуляем.
+const HIGH_PASS = /* glsl */ `
+  uniform sampler2D tDiffuse;
+  uniform vec3 defaultColor;
+  uniform float defaultOpacity;
+  uniform float luminosityThreshold;
+  uniform float smoothWidth;
+  uniform vec2 uSrcTexel;
+  varying vec2 vUv;
+  vec4 bright(vec2 o) {
+    vec4 t = texture2D(tDiffuse, vUv + o * uSrcTexel);
+    if (any(isnan(t)) || any(isinf(t))) return vec4(0.0);
+    float a = smoothstep(luminosityThreshold, luminosityThreshold + smoothWidth, luminance(t.rgb));
+    return mix(vec4(defaultColor, defaultOpacity), t, a);
+  }
+  void main() {
+    gl_FragColor = 0.25 * (bright(vec2(-1.0, -1.0)) + bright(vec2(1.0, -1.0)) + bright(vec2(-1.0, 1.0)) + bright(vec2(1.0, 1.0)));
+  }`;
 
 /** UnrealBloomPass без финального аддитивного смешивания в буфер сцены: результат — this.texture. */
 class BloomMips extends UnrealBloomPass {
   constructor(...args) {
     super(...args);
-    const m = this.materialHighPassFilter;
-    m.fragmentShader = m.fragmentShader.replace('vec4 texel = texture2D( tDiffuse, vUv );', SAFE_TEXEL);
+    const m = this.materialHighPassFilter; // m.uniforms === this.highPassUniforms
+    m.uniforms.uSrcTexel = { value: new THREE.Vector2() };
+    m.fragmentShader = HIGH_PASS;
+  }
+
+  /** b — доля разрешения bloom; sw, sh — размер буфера сцены. */
+  setSource(b, sw, sh) {
+    // b=1: все 4 отсчёта в центре блока 2×2 — ровно как у штатного UnrealBloomPass; b<1: четыре блока 2×2
+    const k = b < 1 ? 0.5 / b : 0;
+    this.highPassUniforms.uSrcTexel.value.set(k / sw, k / sh);
   }
 
   render(renderer, writeBuffer, readBuffer) {
@@ -156,6 +181,7 @@ export class Renderer {
     const prev = this.level;
     this.level = { ...prev, ...l };
     const L = this.level;
+    if (!this.floatRT) L.bloomScale = 0; // bloom-буферы UnrealBloomPass всегда HalfFloat — без float-рендера они неполные
     const samples = Math.min(L.msaa, this.maxSamples);
     if (this.sceneRT && this.sceneRT.samples !== samples) {
       this.sceneRT.samples = samples;
@@ -234,6 +260,7 @@ export class Renderer {
     if (this.bloomPass) {
       const b = this.level.bloomScale || 1;
       this.bloomPass.setSize(Math.max(4, Math.round(size.x * b)), Math.max(4, Math.round(size.y * b)));
+      this.bloomPass.setSource(b, size.x, size.y);
     }
     if (this.camera) {
       this.camera.aspect = w / h;

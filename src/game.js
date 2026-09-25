@@ -30,7 +30,9 @@ function loadSettings() {
   };
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-    if (!s.gfxV) delete s.quality; // старые версии сохраняли 'high' всем — переводим на "Авто"
+    // старые версии сохраняли пресет по умолчанию всем — его переводим на "Авто", явный выбор оставляем
+    const oldDefault = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'medium' : 'high';
+    if (!s.gfxV && s.quality === oldDefault) delete s.quality;
     return { ...def, ...s, gfxV: 2 };
   } catch {
     return def;
@@ -177,6 +179,7 @@ export class Game {
       this.world = buildWorld(def, { renderer: this.renderer.renderer, quality: q });
     }
     this.worldId = def.id;
+    this.rig.track = this.world.track;
     this.fx = new Effects(this.world.scene);
     this.renderer.setView(this.world.scene, this.camera, this.world.lights && this.world.lights.sun);
     this.applyQuality();
@@ -242,6 +245,7 @@ export class Game {
     // гонка "оживает" только после прогрева шейдеров — иначе кадры во время компиляции крутили бы её как демо
     await this.prewarm();
     this.race = race;
+    race.views.forEach((v) => v.setShadowMode(this.realShadows())); // ступень качества могла смениться за время прогрева
     this.autopilot = !!opts.autopilot;
     this.audio.duck(0, 0.05);
     this.state = 'race';

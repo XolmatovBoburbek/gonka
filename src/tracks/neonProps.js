@@ -1269,7 +1269,8 @@ export function makeChevronBoards(track, { minCurv = 0.016, step = 10, colorA = 
     track.frameAtProgress(s, fr);
     if (Math.abs(fr.curv) < minCurv) continue;
     const side = Math.sign(fr.curv); // внешняя сторона поворота
-    const lat = side * (fr.hw + fr.wall + 0.35);
+    // щит (3.2 м поперёк трассы) целиком за стеной: иначе он торчал в полосу, и камера проезжала сквозь него
+    const lat = side * (fr.hw + fr.wall + 0.35 + 1.6);
     const p = fr.pos.clone().addScaledVector(fr.right, lat);
     p.y += 1.75;
     const ry = Math.atan2(-fr.tan.x, -fr.tan.z);

@@ -10,7 +10,7 @@ export const PERF_LEVELS = [
   { name: 'Среднее', scale: 0.85, msaa: 2, bloomScale: 0.5, shadows: true, shadowSize: 1024, shadowEvery: 2, particles: 0.75 },
   { name: 'Среднее−', scale: 0.75, msaa: 0, bloomScale: 0.5, shadows: true, shadowSize: 1024, shadowEvery: 2, particles: 0.75 },
   // на неоне свечение и есть картинка — оставляем дешёвый bloom в четверть разрешения
-  { name: 'Низкое', scale: 0.7, msaa: 0, bloomScale: 0, glowBloom: 0.35, shadows: false, shadowSize: 1024, shadowEvery: 1, particles: 0.5 },
+  { name: 'Низкое', scale: 0.7, msaa: 0, bloomScale: 0, glowBloom: 0.5, shadows: false, shadowSize: 1024, shadowEvery: 1, particles: 0.5 },
   { name: 'Низкое−', scale: 0.55, msaa: 0, bloomScale: 0, shadows: false, shadowSize: 1024, shadowEvery: 1, particles: 0.35 },
 ];
 
@@ -99,7 +99,8 @@ export class PerfGovernor {
     this.buf.length = 0;
     this.acc = 0;
     // идеально ровные кадры реже 60 Гц (экран 48/50 Гц) — это частота экрана, а не нехватка GPU
-    if (Math.sqrt(dev / n) / mean < 0.03 && worst < 1.5 / 60 && mean <= 1 / 48) this.target = mean;
+    // (не быстрее 60 Гц: на мониторах 120/144 Гц "не дотянули до частоты экрана" — это не повод снижать качество)
+    if (Math.sqrt(dev / n) / mean < 0.03 && worst < 1.5 / 60 && mean <= 1 / 48) this.target = Math.max(1 / 60, mean);
     const T = this.target;
     const bad = mean > T * 1.1 || long / n > 0.08;
     const good = mean < T * 1.026 && long / n < 0.02;
