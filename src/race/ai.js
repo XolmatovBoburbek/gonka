@@ -1,4 +1,4 @@
-// ИИ ботов: гоночная траектория, торможение перед поворотами, дрифт с мини-турбо,
+// ИИ ботов: гоночная траектория, торможение перед поворотами, дрифт и буст-шкала,
 // объезд ловушек и соперников, охота за кристаллами и тактическое применение предметов.
 import * as THREE from 'three';
 
@@ -45,7 +45,7 @@ export class BotDriver {
   think(dt, race) {
     const k = this.kart;
     const tr = k.track;
-    const out = { steer: 0, throttle: 1, brake: 0, driftHeld: false, driftPressed: false, useItem: false };
+    const out = { steer: 0, throttle: 1, brake: 0, driftHeld: false, driftPressed: false, useItem: false, useBoost: false };
     const s = k.progress;
     const speed = Math.abs(k.speed);
     const fr = tr.frameAtProgress(s, this._fr);
@@ -108,7 +108,7 @@ export class BotDriver {
     const la = 7 + speed * 0.42;
     tr.pointAt(s + la, this.lane, 0, this._p);
     const desired = Math.atan2(this._p.x - k.pos.x, this._p.z - k.pos.z);
-    const diff = wrapAngle(desired - k.heading);
+    const diff = wrapAngle(desired - k.moveHeading); // по направлению движения: в заносе нос смотрит внутрь поворота
     let steer = -diff * 2.8;
     if (this.skill < 0.6) steer += Math.sin(this.noise * 1.7) * 0.18 * (1 - this.skill);
     out.steer = THREE.MathUtils.clamp(steer, -1, 1);
@@ -138,9 +138,8 @@ export class BotDriver {
     const curveNear = this.avgCurv(s + 4, 28);
     if (k.drift.active) {
       const same = Math.sign(curveNear) === Math.sign(-k.drift.dir);
-      const wantLevel = this.skill > 0.8 ? 3 : this.skill > 0.5 ? 2 : 1;
       const endOfCurve = Math.abs(this.avgCurv(s + 6, 14)) < 0.006;
-      if (!same || endOfCurve || k.drift.level >= wantLevel + (this.skill > 0.9 ? 0 : 1)) {
+      if (!same || endOfCurve) {
         this.driftHold = false;
         this.driftCooldown = 0.8;
       } else this.driftHold = true;
@@ -157,7 +156,21 @@ export class BotDriver {
       }
     }
     out.driftHeld = this.driftHold;
-    if (k.drift.active) out.steer = THREE.MathUtils.clamp(out.steer * 1.15, -1, 1);
+    if (k.drift.active) {
+      out.steer = THREE.MathUtils.clamp(out.steer * 1.15, -1, 1);
+      if (out.steer * k.drift.dir < -0.6) out.steer = -0.6 * k.drift.dir; // долгий полный контр-руль переложил бы занос
+    }
+
+    // --- буст-шкала: копим в заносах, тратим на прямой (сильные боты — сразу три деления)
+    if (k.boostMeter >= 1 && k.boost.time <= 0 && !k.drift.active && !k.airborne && speed > 18) {
+      const want = this.skill > 0.8 ? 3 : this.skill > 0.5 ? 2 : 1;
+      const lvl = Math.min(3, Math.floor(k.boostMeter));
+      // на всей дистанции буста этого уровня не должно быть шпилек — на такой скорости их не пройти
+      const safe = tr.maxCurvatureAhead(s, [0, 45, 85, 140][lvl] + speed * 0.5) < 0.022;
+      const calm = tr.maxCurvatureAhead(s, 40) < 0.012; // и начинать — на прямом участке
+      const nearFinish = race.laps * tr.length - k.totalProgress < 160;
+      if ((safe && calm && (lvl >= want || this.rnd() < dt * 0.3 * (1 - this.skill))) || nearFinish) out.useBoost = true;
+    }
 
     // --- трюк на трамплине
     if (k.airborne && k.trick.canTrick && !k.trick.active && this.rnd() < dt * 6 * this.skill) out.driftPressed = true;

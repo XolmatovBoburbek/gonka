@@ -8,6 +8,7 @@ import { CHARACTERS } from '../data/characters.js';
 import { DRIFT_COLORS } from '../world/fx.js';
 
 const SUBSTEP = 1 / 120;
+const SMOKE = new THREE.Color(0xe8e4f0);
 const INTRO_TIME = 4.3;
 const COUNT_TIME = 3.0;
 
@@ -159,18 +160,20 @@ export class Race {
     const inputs = new Map();
     for (const k of this.karts) {
       let inp;
-      if (!racing) inp = { steer: 0, throttle: 0, brake: 0, driftHeld: false, driftPressed: false, useItem: false };
+      if (!racing) inp = { steer: 0, throttle: 0, brake: 0, driftHeld: false, driftPressed: false, useItem: false, useBoost: false };
       else if (k === this.player && !this.playerIsBot && !k.finished) {
-        inp = { ...input, useItem: input.item };
+        inp = { ...input, useItem: input.item, useBoost: input.boost };
       } else if (k === this.player && !this.playerIsBot && k.finished) {
         inp = this.autoPilot.think(dt, this);
         inp.useItem = false;
+        inp.useBoost = false;
       } else {
         inp = this.bots.get(k).think(dt, this);
-        if (k.finished) inp.useItem = false;
+        if (k.finished) inp.useItem = inp.useBoost = false;
       }
       inputs.set(k, inp);
       if (racing && inp.useItem && k.item) this.items.use(k, this);
+      if (racing && inp.useBoost) k.useBoost();
     }
 
     // --- резиновая лента: боты подтягиваются/притормаживают относительно игрока
@@ -185,7 +188,8 @@ export class Race {
     }
 
     // --- физика с подшагами
-    const steps = Math.min(12, Math.max(1, Math.ceil(dt / SUBSTEP)));
+    // (−0.05: обычный кадр 60 Гц — ровно 2 подшага, а не 3 из-за погрешности dt)
+    const steps = Math.min(6, Math.max(1, Math.ceil(dt / SUBSTEP - 0.05)));
     const h = dt / steps;
     const env = { boostZones: this.world.boostZones, rampZones: this.world.rampZones };
     for (let s = 0; s < steps; s++) {
@@ -270,10 +274,10 @@ export class Race {
         a.pos.z -= nz * overlap * wa;
         b.pos.x += nx * overlap * wb;
         b.pos.z += nz * overlap * wb;
-        const vax = Math.sin(a.heading) * a.speed + a.push.x;
-        const vaz = Math.cos(a.heading) * a.speed + a.push.y;
-        const vbx = Math.sin(b.heading) * b.speed + b.push.x;
-        const vbz = Math.cos(b.heading) * b.speed + b.push.y;
+        const vax = Math.sin(a.moveHeading) * a.speed + a.push.x;
+        const vaz = Math.cos(a.moveHeading) * a.speed + a.push.y;
+        const vbx = Math.sin(b.moveHeading) * b.speed + b.push.x;
+        const vbz = Math.cos(b.moveHeading) * b.speed + b.push.y;
         const rel = (vbx - vax) * nx + (vbz - vaz) * nz;
         if (rel < 0) {
           const imp = -rel * 0.85 + 1.5;
@@ -282,9 +286,9 @@ export class Race {
           b.push.x += nx * imp * wb;
           b.push.y += nz * imp * wb;
           // тот, кто сзади, теряет немного скорости
-          const fa = Math.sin(a.heading) * nx + Math.cos(a.heading) * nz;
+          const fa = Math.sin(a.moveHeading) * nx + Math.cos(a.moveHeading) * nz;
           if (fa > 0.3) a.speed *= 1 - 0.18 * fa * wa * 2;
-          const fb = -(Math.sin(b.heading) * nx + Math.cos(b.heading) * nz);
+          const fb = -(Math.sin(b.moveHeading) * nx + Math.cos(b.moveHeading) * nz);
           if (fb > 0.3) b.speed *= 1 - 0.18 * fb * wb * 2;
           if (-rel > 4) {
             a.emit('bump', { other: b, strength: -rel });
@@ -335,13 +339,16 @@ export class Race {
       if (k.drift.active && !k.airborne) {
         for (const sp of v.sparkPoints) {
           wp.copy(sp).applyMatrix4(v.root.matrixWorld);
-          const lvl = k.drift.level;
-          if (lvl > 0 || Math.random() < 0.3) this.fx.sparks(wp, -f.x - x.x * k.drift.dir * 0.5, -f.z - x.z * k.drift.dir * 0.5, lvl, lvl > 0 ? 2 : 1);
+          // цвет искр — уровень буста, который сейчас копится; чем круче занос, тем их больше
+          const big = Math.abs(k.drift.angle) > 0.3;
+          if (big || Math.random() < 0.5) this.fx.sparks(wp, -f.x - x.x * k.drift.dir * 0.5, -f.z - x.z * k.drift.dir * 0.5, k.drift.level, big ? 2 : 1);
+          // дым из-под скользящих боком задних колёс
+          if (Math.random() < Math.abs(k.drift.angle) * 0.45) this.fx.dust(wp, SMOKE, 0.3 + Math.abs(k.drift.angle) * 0.6);
         }
       }
       // пламя буста
       if (k.boost.time > 0) {
-        const col = k.boost.kind.startsWith('mini') ? DRIFT_COLORS[+k.boost.kind.slice(4)] : undefined;
+        const col = k.boost.kind.startsWith('boost') ? DRIFT_COLORS[+k.boost.kind.slice(5)] : undefined;
         for (const ep of v.exhaustPoints) {
           wp.copy(ep).applyMatrix4(v.root.matrixWorld);
           this.fx.flame(wp, { x: -f.x, z: -f.z }, col);

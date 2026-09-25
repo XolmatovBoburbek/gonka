@@ -927,6 +927,30 @@ kbd {
 .hud-speed .drift i.full {
   box-shadow: 0 0 0 2px var(--ink), 0 0 12px #fff;
 }
+.hud-speed .drift .bkey {
+  align-self: center;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.35);
+  transform: skewX(20deg);
+}
+.hud.boost-ready .hud-speed .drift .bkey {
+  background: #fff;
+  box-shadow: 0 0 10px #ff9a3c;
+  animation: bkeyPulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes bkeyPulse {
+  to {
+    box-shadow: 0 0 18px #ff55e0;
+  }
+}
+.hud.touch-on .hud-speed .drift .bkey {
+  display: none;
+}
 .hud-center {
   position: absolute;
   inset: 0;
@@ -1107,6 +1131,15 @@ kbd {
   width: 80px;
   height: 80px;
 }
+.t-boost {
+  right: calc(max(16px, env(safe-area-inset-right)) + 12px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 116px);
+  width: 80px;
+  height: 80px;
+}
+.hud.boost-ready .t-boost {
+  box-shadow: 0 0 0 3px #fff, 0 0 16px #ff9a3c;
+}
 .t-brake {
   right: calc(max(16px, env(safe-area-inset-right)) + 116px);
   bottom: calc(max(16px, env(safe-area-inset-bottom)) + 92px);
@@ -1127,8 +1160,15 @@ kbd {
 }
 .hud.touch-on .hud-place {
   bottom: auto;
-  top: 150px;
-  right: max(18px, env(safe-area-inset-right));
+  top: 62px;
+  right: calc(max(14px, env(safe-area-inset-right)) + 150px);
+}
+@media (orientation: portrait) {
+  /* на узком экране рядом с паузой — таймер; место — под миникартой */
+  .hud.touch-on .hud-place {
+    top: 150px;
+    right: max(18px, env(safe-area-inset-right));
+  }
 }
 .hud.touch-on .hud-place .num {
   font-size: 60px;

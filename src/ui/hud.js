@@ -1,4 +1,4 @@
-// Игровой HUD: предмет и рулетка, круг и время, место, спидометр и заряд дрифта, миникарта,
+// Игровой HUD: предмет и рулетка, круг и время, место, спидометр и буст-шкала, миникарта,
 // отсчёт, баннеры, предупреждения и сенсорные кнопки.
 import { ITEM_ICONS, ITEM_NAMES } from './icons.js';
 
@@ -30,7 +30,7 @@ export class Hud {
       <div class="hud-place"><span class="num">1</span><span class="of">/8</span></div>
       <div class="hud-speed">
         <div class="spd"><b>0</b><small>км/ч</small></div>
-        <div class="drift"><i class="d1"></i><i class="d2"></i><i class="d3"></i></div>
+        <div class="drift"><i class="d1"></i><i class="d2"></i><i class="d3"></i><span class="bkey">F</span></div>
       </div>
       <div class="hud-center">
         <div class="count"></div>
@@ -50,6 +50,7 @@ export class Hud {
         </div>
         <div class="t-right">
           <button class="tb t-item" data-k="item">ПРЕДМЕТ</button>
+          <button class="tb t-boost" data-k="boost">БУСТ</button>
           <button class="tb t-drift" data-k="drift">ДРИФТ</button>
           <button class="tb t-brake" data-k="brake">ТОРМОЗ</button>
         </div>
@@ -110,6 +111,7 @@ export class Hud {
           t.drift = true;
           t.driftEdge = true;
         } else if (k === 'item') t.itemEdge = true;
+        else if (k === 'boost') t.boostEdge = true;
         else if (k === 'brake') t.brake = true;
         else if (k === 'pause') this.ui.game.setPaused(!this.ui.game.paused);
       };
@@ -158,8 +160,8 @@ export class Hud {
     void this.introEl.offsetWidth;
     this.introEl.classList.add('on');
     setTimeout(() => this.introEl.classList.remove('on'), 4200);
-    if (this.touchEnabled) this.hint('◀ ▶ — руль, ДРИФТ — занос и мини-турбо', 5);
-    else this.hint('Стрелки/WASD — езда · Shift/Пробел — дрифт · E — предмет', 5);
+    if (this.touchEnabled) this.hint('◀ ▶ — руль · ДРИФТ копит буст · БУСТ — ускорение', 5);
+    else this.hint('Стрелки/WASD — езда · Shift/Пробел — дрифт · F — буст · E — предмет', 5);
   }
 
   countdown(n) {
@@ -268,18 +270,17 @@ export class Hud {
       this.spd.textContent = kmh;
       this._last.kmh = kmh;
     }
-    const lv = p.drift.active ? p.drift.level : 0;
-    const charge = p.drift.active ? p.drift.charge : 0;
-    const lvKey = lv + ':' + Math.round(charge * 10);
-    if (this._last.drift !== lvKey) {
-      const th = [0.95, 2.05, 3.3];
+    // буст-шкала: три деления копятся в заносе; F тратит все полные сразу
+    const m = p.boostMeter;
+    const mKey = Math.round(m * 40);
+    if (this._last.meter !== mKey) {
       this.driftBars.forEach((b, i) => {
-        const prev = i === 0 ? 0 : th[i - 1];
-        const f = p.drift.active ? Math.max(0, Math.min(1, (charge - prev) / (th[i] - prev))) : 0;
-        b.style.setProperty('--f', f.toFixed(2));
-        b.classList.toggle('full', lv > i);
+        const f = Math.max(0, Math.min(1, m - i));
+        b.style.setProperty('--f', f.toFixed(3));
+        b.classList.toggle('full', f >= 1);
       });
-      this._last.drift = lvKey;
+      this.el.classList.toggle('boost-ready', m >= 1);
+      this._last.meter = mKey;
     }
     this.el.classList.toggle('boosting', p.boost.time > 0);
 

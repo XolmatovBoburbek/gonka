@@ -1,5 +1,5 @@
-// Аркадная физика карта в "пространстве трассы": газ/тормоз, руление, дрифт с мини-турбо,
-// подпрыгивания, трамплины и трюки, стены, бездорожье, заносы от попаданий.
+// Аркадная физика карта в "пространстве трассы": газ/тормоз, руление, дрифт с настоящим углом заноса,
+// буст-шкала из трёх делений, подпрыгивания, трамплины и трюки, стены, бездорожье, заносы от попаданий.
 import * as THREE from 'three';
 import { rampHeightAt } from '../world/trackMeshes.js';
 
@@ -16,11 +16,20 @@ export const PHYS = {
   radius: 1.15,
   curbWidth: 1.5,
   driftMinSpeed: 13,
-  driftLevels: [0.95, 2.05, 3.3],
-  miniTurbo: [
-    [0.55, 1.2],
-    [0.95, 1.26],
-    [1.45, 1.32],
+  // занос: нос опережает направление движения на угол (рад); руль в поворот — круче, контр-руль — мельче
+  driftAngle: 0.42,
+  driftAngleSteer: 0.26,
+  driftAngleRate: 5.5,
+  driftRecover: 6.5, // как быстро после заноса возвращается сцепление
+  driftScrub: 0.3, // потеря скорости боком скользящих шин
+  driftFlipHold: 0.3, // столько держать полный контр-руль на малом угле, чтобы переложить занос
+  // буст-шкала из трёх делений: копится в заносе и на трюках, тратится вся сразу — уровень = число делений
+  meterRate: 0.42,
+  meterTrick: 0.25,
+  boostLevels: [
+    [0.9, 1.22],
+    [2.0, 1.3],
+    [3.2, 1.38],
   ],
 };
 
@@ -42,7 +51,8 @@ export class Kart {
 
     this.pos = new THREE.Vector3();
     this.prevPos = new THREE.Vector3();
-    this.heading = 0;
+    this.heading = 0; // куда смотрит нос
+    this.moveHeading = 0; // куда на самом деле едет (в заносе отстаёт от носа)
     this.speed = 0;
     this.vy = 0;
     this.airborne = false;
@@ -51,8 +61,10 @@ export class Kart {
     this.steer = 0;
     this.throttle = 0;
 
-    this.drift = { active: false, dir: 0, charge: 0, level: 0, intent: false };
+    // level — какой уровень буста сейчас копится (цвет искр); angle — угол заноса, гаснет и после дрифта
+    this.drift = { active: false, dir: 0, angle: 0, flipT: 0, level: 0, intent: false };
     this.boost = { time: 0, power: 1, kind: '' };
+    this.boostMeter = 0; // 0..3 деления
     this.spinTimer = 0;
     this.spinAngle = 0;
     this.frozenTimer = 0;
@@ -92,6 +104,11 @@ export class Kart {
     return _tmp.set(Math.sin(this.heading), 0, Math.cos(this.heading));
   }
 
+  /** Направление для камеры: по ходу движения, чуть к носу — занос виден сбоку. */
+  get camHeading() {
+    return this.moveHeading + (this.heading - this.moveHeading) * 0.35;
+  }
+
   get boosting() {
     return this.boost.time > 0;
   }
@@ -109,6 +126,8 @@ export class Kart {
     this.pos.copy(fr.pos).addScaledVector(fr.right, lateral);
     this.prevPos.copy(this.pos);
     this.heading = Math.atan2(fr.tan.x, fr.tan.z);
+    this.moveHeading = this.heading;
+    this.drift.angle = 0;
     this.trackIdx = fr.index;
     this.track.project(this.pos, this.trackIdx, this.proj);
     this.progress = this.proj.f * this.track.spacing;
@@ -135,7 +154,7 @@ export class Kart {
       return false;
     }
     this.lastHitBy = by;
-    this.cancelDrift(false);
+    this.cancelDrift();
     this.boost.time = 0;
     if (kind === 'freeze') {
       this.frozenTimer = 1.5;
@@ -148,22 +167,36 @@ export class Kart {
     return true;
   }
 
-  cancelDrift(release = true) {
+  /** Конец заноса: заряд уже в шкале, угол плавно гаснет в step (сцепление возвращается). */
+  cancelDrift() {
     const d = this.drift;
-    if (!d.active) {
-      d.intent = false;
-      return;
-    }
-    if (release && d.level > 0) {
-      const [t, p] = PHYS.miniTurbo[d.level - 1];
-      this.addBoost(t, p, 'mini' + d.level);
-      this.emit('miniTurbo', { level: d.level });
-    }
-    d.active = false;
-    d.charge = 0;
-    d.level = 0;
-    d.dir = 0;
     d.intent = false;
+    if (!d.active) return;
+    d.active = false;
+    d.level = 0;
+    d.flipT = 0;
+  }
+
+  /** Пополнить буст-шкалу; о каждом заполненном делении — событие. */
+  fillMeter(x) {
+    const before = Math.floor(this.boostMeter);
+    this.boostMeter = Math.min(3, this.boostMeter + x);
+    const now = Math.floor(this.boostMeter);
+    if (now > before) this.emit('meterSegment', { level: now });
+  }
+
+  /** Потратить все полные деления: 1 — синий буст, 2 — оранжевый, 3 — фиолетовый (сильнее и дольше). */
+  useBoost() {
+    const n = Math.min(3, Math.floor(this.boostMeter + 1e-6));
+    if (n < 1 || !this.controllable) {
+      this.emit('boostEmpty');
+      return false;
+    }
+    this.boostMeter = Math.max(0, this.boostMeter - n);
+    const [t, p] = PHYS.boostLevels[n - 1];
+    this.addBoost(t, p, 'boost' + n);
+    this.emit('boostFire', { level: n });
+    return true;
   }
 
   respawn() {
@@ -174,7 +207,7 @@ export class Kart {
     this.vy = 0;
     this.airborne = false;
     this.push.set(0, 0);
-    this.cancelDrift(false);
+    this.cancelDrift();
     this.spinTimer = 0;
     this.frozenTimer = 0;
     this.invuln = 2;
@@ -213,6 +246,7 @@ export class Kart {
     this.throttle = throttle;
     this.steer += (steerIn - this.steer) * (1 - Math.exp(-dt * 11));
 
+    const d = this.drift;
     const boosting = this.boost.time > 0;
     const vmaxBase = P.maxSpeed * this.speedF * this.rubber * this.botSpeed;
     let vmax = vmaxBase;
@@ -243,12 +277,13 @@ export class Kart {
         this.speed = Math.abs(this.speed) < d ? 0 : this.speed - Math.sign(this.speed) * d;
       }
       if (this.speed > vmax) this.speed = Math.max(vmax, this.speed - (this.offroad ? 50 : 16) * dt);
+      // занос гасит скорость: шины скользят боком
+      if (d.active) this.speed -= P.driftScrub * Math.sin(Math.abs(d.angle)) * this.speed * dt;
     } else {
       this.speed *= Math.exp(-dt * 0.08);
     }
 
     // ---- дрифт
-    const d = this.drift;
     if (ctrl && input.driftPressed && !this.airborne) {
       this.vy = P.hopVel;
       this.airborne = true;
@@ -264,46 +299,60 @@ export class Kart {
       this.emit('trick');
     }
     if (!input.driftHeld) {
-      if (d.active) this.cancelDrift(true);
+      if (d.active) this.cancelDrift();
       d.intent = false;
     }
     if (d.active) {
-      if (Math.abs(this.speed) < 9 || !ctrl) this.cancelDrift(false);
+      if (Math.abs(this.speed) < 9 || !ctrl) this.cancelDrift();
       else if (!this.airborne) {
-        const tight = this.steer * d.dir;
-        d.charge += dt * (0.75 + 0.55 * Math.max(0, tight)) * this.driftF;
-        const lv = d.charge >= P.driftLevels[2] ? 3 : d.charge >= P.driftLevels[1] ? 2 : d.charge >= P.driftLevels[0] ? 1 : 0;
-        if (lv > d.level) {
-          d.level = lv;
-          this.emit('driftLevel', { level: lv });
-        }
+        // шкала буста копится тем быстрее, чем круче занос и выше скорость
+        const q = Math.min(1.2, Math.abs(this.speed) / P.maxSpeed) * (0.45 + Math.abs(d.angle) / 0.6) * this.driftF;
+        this.fillMeter(dt * P.meterRate * q);
+        d.level = Math.min(3, Math.floor(this.boostMeter) + 1); // цвет искр — какой уровень буста сейчас копится
       }
     }
 
-    // ---- руление
+    // ---- руление: поворачивает направление движения; в заносе нос опережает его на угол заноса
     const absV = Math.abs(this.speed);
     const sf = Math.min(1, absV / 7) * (1 - 0.3 * THREE.MathUtils.clamp((absV - 20) / 24, 0, 1));
     let yawRate;
     if (d.active) {
-      const tight = this.steer * d.dir;
-      yawRate = -d.dir * P.turnRate * this.handF * (0.74 + 0.44 * tight) * Math.max(sf, 0.6);
+      const into = this.steer * d.dir; // +1 — руль в поворот, −1 — контр-руль
+      // без руля — дуга ~40 м, в поворот — круче, полный контр-руль почти выпрямляет
+      yawRate = -d.dir * P.turnRate * this.handF * (0.55 + 0.5 * into) * Math.max(sf, 0.6);
+      if (!this.airborne) {
+        const hard = into < -0.7; // полный контр-руль: машинка выравнивается
+        const target = hard ? 0.05 : (P.driftAngle + P.driftAngleSteer * into) * (0.55 + 0.45 * Math.min(1, absV / 30));
+        d.angle += (target - d.angle) * (1 - Math.exp(-dt * P.driftAngleRate * (hard ? 1.6 : 1)));
+        // перекладка: держать полный контр-руль, когда машинка уже выровнялась, — занос в другую сторону
+        if (hard && d.angle < 0.2) {
+          d.flipT += dt;
+          if (d.flipT > P.driftFlipHold) {
+            d.dir = -d.dir;
+            d.angle = -d.angle;
+            d.flipT = 0;
+            this.emit('driftFlip');
+          }
+        } else d.flipT = 0;
+      }
     } else {
       yawRate = -this.steer * P.turnRate * this.handF * sf * (this.speed < -0.5 ? -1 : 1);
+      // после заноса сцепление возвращается — нос плавно доворачивает по ходу
+      if (d.angle !== 0) {
+        d.angle *= Math.exp(-dt * P.driftRecover);
+        if (Math.abs(d.angle) < 0.003) d.angle = 0;
+      }
     }
     if (this.airborne) yawRate *= this.hop > 0 ? 0.8 : 0.3;
     if (this.spinTimer > 0 || this.frozenTimer > 0) yawRate = 0;
-    this.heading += yawRate * dt;
+    this.moveHeading += yawRate * dt;
+    this.heading = this.moveHeading - d.dir * d.angle;
 
-    // ---- перемещение
-    const fx = Math.sin(this.heading);
-    const fz = Math.cos(this.heading);
-    let vx = fx * this.speed + this.push.x;
-    let vz = fz * this.speed + this.push.y;
-    if (d.active) {
-      const slide = -d.dir * this.speed * 0.1;
-      vx += -fz * slide;
-      vz += fx * slide;
-    }
+    // ---- перемещение — по направлению движения
+    const fx = Math.sin(this.moveHeading);
+    const fz = Math.cos(this.moveHeading);
+    const vx = fx * this.speed + this.push.x;
+    const vz = fz * this.speed + this.push.y;
     this.pos.x += vx * dt;
     this.pos.z += vz * dt;
     this.push.multiplyScalar(Math.exp(-dt * 4.5));
@@ -324,13 +373,14 @@ export class Kart {
       if (into > 0.02) {
         const tx = fx + (nx / nl) * into * 1.08;
         const tz = fz + (nz / nl) * into * 1.08;
-        this.heading = Math.atan2(tx, tz);
+        this.moveHeading = Math.atan2(tx, tz);
+        this.heading = this.moveHeading - d.dir * d.angle;
         const loss = Math.min(0.65, into * 0.85);
         const before = this.speed;
         this.speed *= 1 - loss;
         if (into > 0.28 && before > 12) {
           this.emit('wallHit', { strength: into });
-          if (into > 0.5) this.cancelDrift(false);
+          if (into > 0.5) this.cancelDrift();
         }
       }
       // гасим составляющую толчка в стену
@@ -392,6 +442,7 @@ export class Kart {
         this.hop = 0;
         if (this.trick.pending) {
           this.addBoost(0.9, 1.25, 'trick');
+          this.fillMeter(P.meterTrick);
           this.emit('trickBoost');
         }
         this.trick.active = false;
@@ -400,10 +451,12 @@ export class Kart {
         if (impact > 9) this.emit('land', { impact });
         // начало дрифта после подпрыгивания
         if (wasHop && d.intent && input.driftHeld && Math.abs(this.steer) > 0.22 && this.speed > P.driftMinSpeed && ctrl) {
+          const dir = Math.sign(this.steer);
+          d.angle *= d.dir * dir; // остаток угла прошлого заноса — в знаке нового, нос не дёргается
           d.active = true;
-          d.dir = Math.sign(this.steer);
-          d.charge = 0;
-          d.level = 0;
+          d.dir = dir;
+          d.flipT = 0;
+          d.level = Math.min(3, Math.floor(this.boostMeter) + 1);
           this.emit('driftStart');
         }
       } else if (this.pos.y < surf - 30) {
@@ -456,6 +509,7 @@ export class Kart {
       steer: this.steer,
       drifting: this.drift.active,
       driftDir: this.drift.dir,
+      driftAngle: this.drift.angle,
       boosting: this.boost.time > 0,
       boostKind: this.boost.kind,
       airborne: this.airborne,

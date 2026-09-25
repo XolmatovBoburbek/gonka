@@ -6,6 +6,7 @@ const KEYS = {
   down: ['ArrowDown', 'KeyS'],
   drift: ['Space', 'ShiftLeft', 'ShiftRight'],
   item: ['KeyE', 'Enter', 'ControlLeft', 'ControlRight', 'KeyQ'],
+  boost: ['KeyF', 'KeyX'],
   back: ['KeyC'],
   pause: ['Escape', 'KeyP'],
   respawn: ['KeyR'],
@@ -16,7 +17,7 @@ export class Input {
   constructor() {
     this.down = new Set();
     this.edges = new Set();
-    this.touch = { steer: 0, gas: false, brake: false, drift: false, item: false, itemEdge: false, driftEdge: false };
+    this.touch = { steer: 0, gas: false, brake: false, drift: false, item: false, itemEdge: false, driftEdge: false, boostEdge: false };
     this.touchMode = false;
     this.autoGas = false;
     this.padPrev = [];
@@ -65,6 +66,7 @@ export class Input {
       driftHeld: false,
       driftPressed: false,
       item: false,
+      boost: false,
       lookBack: false,
       pause: false,
       respawn: false,
@@ -81,6 +83,7 @@ export class Input {
     s.driftHeld = this.isDown('drift');
     s.driftPressed = this.pressed('drift');
     s.item = this.pressed('item');
+    s.boost = this.pressed('boost');
     s.lookBack = this.isDown('back');
     s.pause = this.pressed('pause');
     s.respawn = this.pressed('respawn');
@@ -107,7 +110,8 @@ export class Input {
       s.brake = Math.max(s.brake, brk);
       s.driftHeld = s.driftHeld || b(5) || b(2);
       s.driftPressed = s.driftPressed || edge(5) || edge(2);
-      s.item = s.item || edge(4) || edge(3);
+      s.item = s.item || edge(4);
+      s.boost = s.boost || edge(3);
       s.lookBack = s.lookBack || b(8);
       s.pause = s.pause || edge(9);
       s.confirm = edge(0);
@@ -127,7 +131,9 @@ export class Input {
       s.driftHeld = s.driftHeld || t.drift;
       s.driftPressed = s.driftPressed || t.driftEdge;
       s.item = s.item || t.itemEdge;
+      s.boost = s.boost || t.boostEdge;
       t.itemEdge = false;
+      t.boostEdge = false;
       t.driftEdge = false;
     }
     s.steer = Math.max(-1, Math.min(1, steer));

@@ -39,8 +39,8 @@ export class CameraRig {
   }
 
   snapChase(kart) {
-    this.headingSm = kart.heading;
-    const fwd = new THREE.Vector3(Math.sin(kart.heading), 0, Math.cos(kart.heading));
+    this.headingSm = kart.camHeading;
+    const fwd = new THREE.Vector3(Math.sin(this.headingSm), 0, Math.cos(this.headingSm));
     this.pos.copy(kart.pos).addScaledVector(fwd, -5.8).add(new THREE.Vector3(0, 2.4, 0));
     this.look.copy(kart.pos).addScaledVector(fwd, 4).add(new THREE.Vector3(0, 1.3, 0));
     this._apply(0);
@@ -48,7 +48,8 @@ export class CameraRig {
 
   updateChase(dt, kart) {
     const k = 1 - Math.exp(-dt * 6.5);
-    this.headingSm = lerpAngle(this.headingSm, kart.heading, k);
+    // камера идёт по ходу движения, а не за носом: в заносе машинку видно боком
+    this.headingSm = lerpAngle(this.headingSm, kart.camHeading, k);
     const sp = Math.abs(kart.speed);
     const s01 = Math.min(1.4, sp / 40);
     const boosting = kart.boost.time > 0;
@@ -58,7 +59,8 @@ export class CameraRig {
     const height = (2.25 + s01 * 0.3) * this.distScale;
     const desired = new THREE.Vector3().copy(kart.pos).addScaledVector(fwd, -dist * dir);
     desired.y = kart.pos.y + height;
-    const kp = this.lookBack ? 1 : 1 - Math.exp(-dt * 11);
+    // на высокой скорости (буст) камера держится плотнее — иначе машинка "улетает" вдаль
+    const kp = this.lookBack ? 1 : 1 - Math.exp(-dt * (11 + Math.max(0, s01 - 1) * 20));
     this.pos.lerp(desired, kp);
     // не опускаться ниже карта
     if (this.pos.y < kart.pos.y + 1.1) this.pos.y = kart.pos.y + 1.1;
@@ -66,7 +68,7 @@ export class CameraRig {
     const lookT = new THREE.Vector3().copy(kart.pos).addScaledVector(fwd, 4.5 * dir);
     lookT.y = kart.pos.y + 1.25;
     this.look.lerp(lookT, this.lookBack ? 1 : 1 - Math.exp(-dt * 14));
-    const targetFov = 66 + s01 * 9 + (boosting ? 9 : 0);
+    const targetFov = 66 + s01 * 9 + (boosting ? (kart.boost.kind === 'boost3' ? 11 : 9) : 0);
     this.fov += (targetFov - this.fov) * (1 - Math.exp(-dt * 4));
     const targetRoll = kart.drift.active ? -kart.drift.dir * 0.035 : -kart.steer * 0.012 * s01;
     this.roll += (targetRoll - this.roll) * (1 - Math.exp(-dt * 5));

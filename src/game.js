@@ -420,7 +420,7 @@ export class Game {
     let input = inp;
     if (this.autopilot && race.state === 'racing' && !player.finished) {
       const ap = race.autoPilot.think(dt, race);
-      input = { ...inp, ...ap, item: ap.useItem };
+      input = { ...inp, ...ap, item: ap.useItem, boost: ap.useBoost };
     }
     if (inp.respawn && race.state === 'racing' && !player.finished) player.respawn();
     this.rig.lookBack = inp.lookBack && race.state === 'racing';
@@ -501,15 +501,31 @@ export class Game {
             if (e.kind === 'item' || e.kind === 'pad') this.flash = Math.max(this.flash, 0.12);
           }
           break;
-        case 'miniTurbo':
-          if (vol > 0.05) a.sfx('miniturbo' + e.level, { volume: vol });
-          if (isP && e.level >= 2) fx.popups.show(e.level === 3 ? 'УЛЬТРА!' : 'ТУРБО!', player.pos, { color: e.level === 3 ? '#ff7ae6' : '#ffb03a', stroke: '#4a1a6a', life: 0.7, scale: 2.4 });
+        case 'boostFire': {
+          // буст из шкалы: 1 деление — синий, 2 — оранжевый, 3 — фиолетовый УЛЬТРА
+          const L = e.level;
+          if (vol > 0.05) a.sfx('miniturbo' + L, { volume: vol });
+          if (isP) {
+            fx.popups.show(['', 'БУСТ!', 'ТУРБО!', 'УЛЬТРА!'][L], player.pos, { color: ['', '#6fc8ff', '#ffb03a', '#ff7ae6'][L], stroke: '#2a1a5a', life: 0.6 + L * 0.1, scale: 2 + L * 0.3 });
+            this.rig.shake(0.15 + L * 0.12);
+            this.flash = Math.max(this.flash, 0.04 + L * 0.04);
+          }
+          break;
+        }
+        case 'meterSegment':
+          if (isP) {
+            a.sfx('driftLevel', { pitch: [1, 1, 1.25, 1.5][e.level] });
+            this.ui.hud.hint(this.ui.hud.touchEnabled ? 'Буст накоплен — жми БУСТ или копи дальше!' : 'Буст накоплен — жми F или копи до трёх делений!', 3.5);
+          }
+          break;
+        case 'boostEmpty':
+          if (isP) a.sfx('uiBack', { volume: 0.5 });
           break;
         case 'driftStart':
           if (vol > 0.05) a.sfx('driftStart', { volume: vol * 0.7 });
           break;
-        case 'driftLevel':
-          if (isP) a.sfx('driftLevel', { pitch: [1, 1, 1.25, 1.5][e.level] });
+        case 'driftFlip':
+          if (vol > 0.05) a.sfx('driftStart', { volume: vol * 0.55 });
           break;
         case 'hop':
           break;
