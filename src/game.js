@@ -261,8 +261,8 @@ export class Game {
     this.ui.hud.show(true, this.race);
     this.ui.hud.intro(def);
     this.audio.stopEngine();
+    this.audio.setMusicIntensity(0); // до playMusic: иначе после финального круга новая гонка стартует в ускоренном темпе
     this.audio.playMusic(def.music);
-    this.audio.setMusicIntensity(0);
     this.rig.orbitAngle = 0;
     await this.nextFrame();
   }

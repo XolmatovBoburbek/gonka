@@ -331,6 +331,167 @@ function drumTom(S, out, t, vel, freq) {
   releaseOnEnd(o, [o, g]);
 }
 
+/** Тайко (нагадо-дайко): глубокий «дон» — тон с падающей высотой, второй мод кожи и удар бати. */
+function drumTaiko(S, out, t, vel) {
+  const ctx = S.ctx;
+  const o = osc(ctx, 'sine', 120, t);
+  o.frequency.exponentialRampToValueAtTime(70, t + 0.1);
+  o.frequency.exponentialRampToValueAtTime(56, t + 1.1); // хвост к ля большой октавы — не спорит с басом
+  const g = gainNode(ctx, 0);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vel, t + 0.003);
+  g.gain.setTargetAtTime(0, t + 0.03, 0.2);
+  o.connect(g).connect(out);
+  o.start(t);
+  o.stop(t + 1.25);
+  releaseOnEnd(o, [o, g]);
+  const m = osc(ctx, 'sine', 205, t);
+  m.frequency.exponentialRampToValueAtTime(128, t + 0.12);
+  const mg = gainNode(ctx, 0);
+  mg.gain.setValueAtTime(vel * 0.3, t);
+  mg.gain.setTargetAtTime(0, t + 0.003, 0.08);
+  m.connect(mg).connect(out);
+  m.start(t);
+  m.stop(t + 0.6);
+  releaseOnEnd(m, [m, mg]);
+  const n = noiseSrc(S, t, 0.6);
+  const lp = biquad(ctx, 'lowpass', 1100, 0.7);
+  const ng = gainNode(ctx, 0);
+  ng.gain.setValueAtTime(vel * 0.55, t);
+  ng.gain.setTargetAtTime(vel * 0.06, t + 0.002, 0.01);
+  ng.gain.setTargetAtTime(0, t + 0.03, 0.14);
+  n.connect(lp).connect(ng).connect(out);
+  releaseOnEnd(n, [n, lp, ng]);
+}
+
+/** «Ка» — удар по деревянному ободу тайко: сухой короткий щелчок. */
+function drumKa(S, out, t, vel) {
+  const ctx = S.ctx;
+  const o = osc(ctx, 'triangle', 1250, t);
+  o.frequency.exponentialRampToValueAtTime(1080, t + 0.03);
+  const g = gainNode(ctx, 0);
+  g.gain.setValueAtTime(vel * 0.5, t);
+  g.gain.setTargetAtTime(0, t, 0.016);
+  o.connect(g).connect(out);
+  o.start(t);
+  o.stop(t + 0.12);
+  releaseOnEnd(o, [o, g]);
+  const n = noiseSrc(S, t, 0.08);
+  const bp = biquad(ctx, 'bandpass', 2200, 2.5);
+  const ng = gainNode(ctx, 0);
+  ng.gain.setValueAtTime(vel * 0.9, t);
+  ng.gain.setTargetAtTime(0, t, 0.008);
+  n.connect(bp).connect(ng).connect(out);
+  releaseOnEnd(n, [n, bp, ng]);
+}
+
+/** Хёсиги — две деревянные колотушки: звонкий высокий «тён» с коротким звоном. */
+function drumClack(S, out, t, vel) {
+  const ctx = S.ctx;
+  for (const [f, a, d] of [[2450, 0.7, 0.042], [3900, 0.35, 0.024]]) {
+    const o = osc(ctx, 'sine', f, t);
+    const g = gainNode(ctx, 0);
+    g.gain.setValueAtTime(vel * a, t);
+    g.gain.setTargetAtTime(0, t, d);
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + 0.28);
+    releaseOnEnd(o, [o, g]);
+  }
+  const n = noiseSrc(S, t, 0.03);
+  const hp = biquad(ctx, 'highpass', 3000, 0.7);
+  const ng = gainNode(ctx, 0);
+  ng.gain.setValueAtTime(vel * 0.6, t);
+  ng.gain.setTargetAtTime(0, t, 0.003);
+  n.connect(hp).connect(ng).connect(out);
+  releaseOnEnd(n, [n, hp, ng]);
+}
+
+// Атаригане: негармоничные призвуки [отношение, амплитуда, спад (с)]
+const KANE_P = [[1, 1, 0.14], [1.48, 0.6, 0.11], [2.27, 0.45, 0.08], [2.93, 0.3, 0.06], [3.89, 0.2, 0.045]];
+
+/** Атаригане — маленький ручной гонг праздничного оркестра (матсури-баяси): металлическое «тян». */
+function drumKane(S, out, t, vel) {
+  const ctx = S.ctx;
+  for (const [r, a, d] of KANE_P) {
+    const o = osc(ctx, 'sine', 1180 * r, t);
+    const g = gainNode(ctx, 0);
+    g.gain.setValueAtTime(vel * a * 0.3, t);
+    g.gain.setTargetAtTime(0, t, d);
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + 0.75);
+    releaseOnEnd(o, [o, g]);
+  }
+  const n = noiseSrc(S, t, 0.03);
+  const hp = biquad(ctx, 'highpass', 5000, 0.7);
+  const ng = gainNode(ctx, 0);
+  ng.gain.setValueAtTime(vel * 0.4, t);
+  ng.gain.setTargetAtTime(0, t, 0.004);
+  n.connect(hp).connect(ng).connect(out);
+  releaseOnEnd(n, [n, hp, ng]);
+}
+
+/** Евробит: «большой» клэп-снейр — три вспышки хлопка и плотный шумовой хвост, резко обрезанный гейтом. */
+function drumGatedSnare(S, out, t, vel) {
+  const ctx = S.ctx;
+  const o = osc(ctx, 'triangle', 210, t);
+  o.frequency.exponentialRampToValueAtTime(160, t + 0.05);
+  const og = gainNode(ctx, 0);
+  og.gain.setValueAtTime(vel * 0.4, t);
+  og.gain.setTargetAtTime(0, t + 0.004, 0.04);
+  o.connect(og).connect(out);
+  o.start(t);
+  o.stop(t + 0.2);
+  releaseOnEnd(o, [o, og]);
+  const n = noiseSrc(S, t, 0.3);
+  const hp = biquad(ctx, 'highpass', 900, 0.7);
+  const pk = biquad(ctx, 'peaking', 2400, 1);
+  pk.gain.value = 4;
+  const g = gainNode(ctx, 0);
+  g.gain.setValueAtTime(0, t);
+  for (let i = 0; i < 3; i++) {
+    const tt = t + i * 0.009;
+    g.gain.setValueAtTime(vel * 0.5, tt);
+    g.gain.setTargetAtTime(vel * 0.12, tt + 0.001, 0.003);
+  }
+  g.gain.setValueAtTime(vel * 0.45, t + 0.027);
+  g.gain.setTargetAtTime(vel * 0.17, t + 0.028, 0.06);
+  g.gain.setTargetAtTime(0, t + 0.19, 0.006); // гейт
+  n.connect(hp).connect(pk).connect(g).connect(out);
+  releaseOnEnd(n, [n, hp, pk, g]);
+}
+
+/** Конга / бонго (открытый удар ладонью): тон с лёгким падением высоты, второй мод и шлепок. */
+function drumHand(S, out, t, vel, f, decay, slap) {
+  const ctx = S.ctx;
+  const o = osc(ctx, 'sine', f * 1.08, t);
+  o.frequency.exponentialRampToValueAtTime(f, t + 0.04);
+  const g = gainNode(ctx, 0);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vel * 0.8, t + 0.002);
+  g.gain.setTargetAtTime(0, t + 0.002, decay);
+  o.connect(g).connect(out);
+  o.start(t);
+  o.stop(t + decay * 5.5);
+  releaseOnEnd(o, [o, g]);
+  const m = osc(ctx, 'sine', f * 1.52, t);
+  const mg = gainNode(ctx, 0);
+  mg.gain.setValueAtTime(vel * 0.22, t);
+  mg.gain.setTargetAtTime(0, t, decay * 0.3);
+  m.connect(mg).connect(out);
+  m.start(t);
+  m.stop(t + decay * 2);
+  releaseOnEnd(m, [m, mg]);
+  const n = noiseSrc(S, t, 0.05);
+  const bp = biquad(ctx, 'bandpass', slap, 1.2);
+  const ng = gainNode(ctx, 0);
+  ng.gain.setValueAtTime(vel * 0.4, t);
+  ng.gain.setTargetAtTime(0, t, 0.006);
+  n.connect(bp).connect(ng).connect(out);
+  releaseOnEnd(n, [n, bp, ng]);
+}
+
 /** One-shot AudioBuffer playback (pre-rendered drums). */
 function playBuffer(ctx, buf, out, t, vel, rate) {
   const s = ctx.createBufferSource();
@@ -358,7 +519,17 @@ const DRUM_KIT = [
   ['shaker', 0.16, (S, o, t) => drumShaker(S, o, t, 1)],
   ['crash', 2.0, (S, o, t) => drumCrash(S, o, t, 1)],
   ['tom', 0.46, (S, o, t) => drumTom(S, o, t, 1, TOM_BASE)],
+  // перкуссия тем локаций (вызываются и напрямую, пока набор не готов)
+  ['taiko', 1.3, drumTaiko],
+  ['ka', 0.15, drumKa],
+  ['clack', 0.3, drumClack],
+  ['kane', 0.8, drumKane],
+  ['gsnare', 0.32, drumGatedSnare],
+  ['conga', 0.66, (S, o, t, v) => drumHand(S, o, t, v, 262, 0.12, 1500)],
+  ['bongo', 0.36, (S, o, t, v) => drumHand(S, o, t, v, 523, 0.065, 2600)],
 ];
+// Перкуссия, которую темы пишут отдельными партиями (см. PERC_HIT)
+const PERC = ['taiko', 'ka', 'clack', 'kane', 'conga', 'bongo'];
 
 /**
  * Renders every drum voice once into AudioBuffers (OfflineAudioContext) so the
@@ -369,7 +540,13 @@ function renderDrumKit(ctx, done) {
   const OAC = typeof window !== 'undefined' && (window.OfflineAudioContext || window.webkitOfflineAudioContext);
   if (!OAC) return done(null);
   const rate = ctx.sampleRate;
-  const slot = 2.1;
+  // каждый звук в своём отрезке (его длина + зазор 0.1 с)
+  const at = [];
+  let total = 0;
+  for (const [, len] of DRUM_KIT) {
+    at.push(total);
+    total += len + 0.1;
+  }
   let finished = false;
   const finish = (rendered) => {
     if (finished) return;
@@ -380,15 +557,15 @@ function renderDrumKit(ctx, done) {
     DRUM_KIT.forEach(([name, len], i) => {
       const n = Math.floor(len * rate);
       const b = ctx.createBuffer(1, n, rate);
-      b.getChannelData(0).set(data.subarray(Math.floor(i * slot * rate), Math.floor(i * slot * rate) + n));
+      b.getChannelData(0).set(data.subarray(Math.floor(at[i] * rate), Math.floor(at[i] * rate) + n));
       kit[name] = b;
     });
     done(kit);
   };
   try {
-    const off = new OAC(1, Math.ceil(rate * slot * DRUM_KIT.length), rate);
+    const off = new OAC(1, Math.ceil(rate * total), rate);
     const S = { ctx: off, noise: makeNoiseBuffer(off, 2) };
-    DRUM_KIT.forEach(([, , fn], i) => fn(S, off.destination, i * slot));
+    DRUM_KIT.forEach(([, , fn], i) => fn(S, off.destination, at[i], 1));
     off.oncomplete = (e) => finish(e.renderedBuffer);
     const p = off.startRendering();
     if (p && p.then) p.then(finish, () => finish(null));
@@ -448,15 +625,17 @@ function synthBass(S, out, t, dur, midi, vel, kind) {
 
 /**
  * Detuned-saw chord (pads and stabs). Two saws per note panned L/R for width.
- * o: { attack, release, cut0, cut1, cutTc, detune, sustain }
+ * o: { attack, release, cut0, cut1, cutTc, detune, sustain, swell, scoop }
+ * swell — медь: фильтр раскрывается от этой частоты до cut0 за атаку; scoop — подъезд высоты снизу (центы).
  */
 function synthChordSaw(S, out, t, dur, notes, vel, o) {
   const ctx = S.ctx;
   const attack = o.attack;
   dur = Math.max(dur, attack + 0.02);
   const lp = biquad(ctx, 'lowpass', o.cut0, 0.7);
-  lp.frequency.setValueAtTime(o.cut0, t);
-  lp.frequency.setTargetAtTime(o.cut1, t, o.cutTc);
+  lp.frequency.setValueAtTime(o.swell || o.cut0, t);
+  if (o.swell) lp.frequency.linearRampToValueAtTime(o.cut0, t + attack);
+  lp.frequency.setTargetAtTime(o.cut1, t + (o.swell ? attack : 0), o.cutTc);
   const g = gainNode(ctx, 0);
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(vel, t + attack);
@@ -477,8 +656,13 @@ function synthChordSaw(S, out, t, dur, notes, vel, o) {
     const f = mtof(m);
     const a = osc(ctx, 'sawtooth', f, t);
     const b = osc(ctx, 'sawtooth', f, t);
-    a.detune.setValueAtTime(-o.detune, t);
-    b.detune.setValueAtTime(o.detune, t);
+    const sc = o.scoop || 0;
+    a.detune.setValueAtTime(-o.detune - sc, t);
+    b.detune.setValueAtTime(o.detune - sc, t);
+    if (sc) {
+      a.detune.linearRampToValueAtTime(-o.detune, t + 0.05);
+      b.detune.linearRampToValueAtTime(o.detune, t + 0.05);
+    }
     a.connect(pl || lp);
     b.connect(pr || lp);
     a.start(t);
@@ -673,6 +857,327 @@ function synthLead(S, out, t, dur, midi, vel, o, glideFrom) {
 }
 
 // ---------------------------------------------------------------------------
+// Тоны, синтезированные в JS прямо в AudioBuffer (по разу на ноту, кэш в S.tones):
+// щипковые струны по Карплусу–Стронгу и стил-пэн. Нота потом стоит 2 узла.
+// ---------------------------------------------------------------------------
+
+// secs — длина буфера, t60 — затухание (с), damp — фильтр петли (0..0.5, больше — глуше),
+// tone — яркость щипка (0..1), pos — точка щипка (доля струны), buzz — порог «савари»
+// (жужжание струны сямисэна о порожек), click — удар ногтя-цумэ / бати по коже.
+const STRINGS = {
+  koto: { secs: 1.2, t60: 1.5, damp: 0.18, tone: 0.8, pos: 0.13, buzz: 0, click: 0.12 },
+  shamisen: { secs: 0.8, t60: 0.9, damp: 0.08, tone: 1, pos: 0.07, buzz: 0.45, click: 0.6 },
+  uke: { secs: 0.9, t60: 0.8, damp: 0.45, tone: 0.3, pos: 0.22, buzz: 0, click: 0.03 },
+};
+
+/** Струна по Карплусу–Стронгу: шумовой щипок бежит по дробной линии задержки с фильтром потерь. */
+function makeString(ctx, f, o) {
+  const rate = ctx.sampleRate;
+  const n = Math.floor(rate * o.secs);
+  const buf = ctx.createBuffer(1, n, rate);
+  const d = buf.getChannelData(0);
+  const P = rate / f;
+  const D = P - o.damp; // двухотводный фильтр петли добавляет damp отсчётов задержки
+  const Di = Math.floor(D);
+  const fr = D - Di;
+  const loss = Math.pow(0.001, P / (rate * o.t60));
+  // возбуждение: период окрашенного шума минус его сдвинутая копия (точка щипка)
+  const E = Math.ceil(P);
+  const exc = new Float32Array(E);
+  let lp = 0;
+  for (let i = 0; i < E; i++) {
+    lp += o.tone * (Math.random() * 2 - 1 - lp);
+    exc[i] = lp;
+  }
+  const pd = Math.max(1, Math.round(P * o.pos));
+  for (let i = E - 1; i >= pd; i--) exc[i] -= exc[i - pd];
+  let ep = 1e-9;
+  for (let i = 0; i < E; i++) ep = Math.max(ep, Math.abs(exc[i]));
+  for (let i = 0; i < n; i++) {
+    const j = i - Di;
+    const a = j >= 0 ? d[j] : 0;
+    const b = j >= 1 ? d[j - 1] : 0;
+    const c = j >= 2 ? d[j - 2] : 0;
+    const x0 = a + fr * (b - a);
+    let v = loss * (x0 + o.damp * (b + fr * (c - b) - x0));
+    if (o.buzz && v < -o.buzz) v = -o.buzz + (v + o.buzz) * 0.25;
+    d[i] = i < E ? v + exc[i] / ep : v;
+  }
+  // щелчок атаки, срез постоянной составляющей, нормировка и затухающий край
+  let prev = 0;
+  let y = 0;
+  let peak = 1e-9;
+  const clickLen = Math.floor(rate * 0.02);
+  for (let i = 0; i < n; i++) {
+    let x = d[i];
+    if (i < clickLen) x += o.click * (Math.random() * 2 - 1) * Math.exp(-i / (rate * 0.003));
+    y = x - prev + 0.995 * y;
+    prev = x;
+    d[i] = y;
+    if (Math.abs(y) > peak) peak = Math.abs(y);
+  }
+  const fade = Math.floor(rate * 0.03);
+  for (let i = 0; i < n; i++) d[i] *= (0.9 / peak) * (i > n - fade ? (n - i) / fade : 1);
+  return buf;
+}
+
+// Стил-пэн: [отношение частоты, амплитуда, спад (с), «расцвет» (с)]. Октава и дуодецима чуть
+// завышены, основной тон расщеплён (медленные биения), верхние призвуки негармоничны.
+const PAN_P = [
+  [1, 1, 0.36, 0],
+  [1.0025, 0.28, 0.45, 0],
+  [2.005, 0.6, 0.26, 0.018],
+  [3.01, 0.22, 0.14, 0.006],
+  [4.16, 0.07, 0.05, 0],
+  [5.43, 0.04, 0.035, 0],
+];
+
+/** Нота стил-пэна: сумма затухающих синусов (поворот фазора) + мягкий удар резиновой палочки. */
+function makePan(ctx, f) {
+  const rate = ctx.sampleRate;
+  const n = Math.floor(rate * 1.3);
+  const buf = ctx.createBuffer(1, n, rate);
+  const d = buf.getChannelData(0);
+  const k = Math.pow(523 / f, 0.3); // высокие ноты звенят короче
+  for (const [r, amp, dec, bloom] of PAN_P) {
+    const w = (2 * Math.PI * f * r) / rate;
+    if (w > 2.6) continue;
+    const cw = Math.cos(w);
+    const sw = Math.sin(w);
+    const kd = Math.exp(-1 / (rate * dec * k));
+    const kb = bloom ? Math.exp(-1 / (rate * bloom)) : 0;
+    let x = 0;
+    let y = 1;
+    let e = amp;
+    let b = 1;
+    for (let i = 0; i < n; i++) {
+      const nx = x * cw + y * sw;
+      y = y * cw - x * sw;
+      x = nx;
+      e *= kd;
+      b *= kb;
+      d[i] += x * e * (1 - b);
+    }
+  }
+  const atk = Math.floor(rate * 0.0015);
+  let lp = 0;
+  let peak = 1e-9;
+  for (let i = 0; i < n; i++) {
+    lp += 0.15 * (Math.random() * 2 - 1 - lp);
+    const v = d[i] * (i < atk ? i / atk : 1) + lp * 0.5 * Math.exp(-i / (rate * 0.005));
+    d[i] = v;
+    if (Math.abs(v) > peak) peak = Math.abs(v);
+  }
+  const fade = Math.floor(rate * 0.05);
+  for (let i = 0; i < n; i++) d[i] *= (0.9 / peak) * (i > n - fade ? (n - i) / fade : 1);
+  return buf;
+}
+
+/** Буфер тона kind ('koto' | 'shamisen' | 'uke' | 'pan') для ноты midi — синтезируется при первом запросе. */
+function toneBuffer(S, kind, midi) {
+  const cache = S.tones || (S.tones = new Map());
+  const key = kind + midi;
+  let b = cache.get(key);
+  if (!b) {
+    b = kind === 'pan' ? makePan(S.ctx, mtof(midi)) : makeString(S.ctx, mtof(midi), STRINGS[kind]);
+    cache.set(key, b);
+  }
+  return b;
+}
+
+/**
+ * Нота из кэша тонов: источник (bend — подтяжка высоты на атаке, центы) → громкость → out.
+ * dur > 0 — приглушить через dur секунд, иначе звучит до конца буфера.
+ */
+function playTone(S, out, t, kind, midi, vel, dur, bend) {
+  const ctx = S.ctx;
+  const s = ctx.createBufferSource();
+  s.buffer = toneBuffer(S, kind, midi);
+  if (bend && s.detune) {
+    s.detune.setValueAtTime(bend, t);
+    s.detune.linearRampToValueAtTime(0, t + 0.045);
+  }
+  const g = gainNode(ctx, vel);
+  s.connect(g).connect(out);
+  s.start(t);
+  if (dur > 0 && dur < s.buffer.duration) {
+    g.gain.setValueAtTime(vel, t + dur);
+    g.gain.setTargetAtTime(0, t + dur, 0.025);
+    s.stop(t + dur + 0.15);
+  }
+  releaseOnEnd(s, [s, g]);
+}
+
+/**
+ * Кото: щипок с подтяжкой высоты на атаке; долгие ноты мелодии (от o.trem шагов) —
+ * тремоло повторными щипками по шестнадцатым, каждый глушится следующим.
+ */
+function synthKoto(S, out, t, dur, midi, vel, o, sd) {
+  playTone(S, out, t, 'koto', midi, vel, dur + 0.3, -40);
+  if (!o.trem || dur < o.trem * sd) return;
+  for (let tt = t + 2 * sd; tt < t + dur - sd * 0.5; tt += sd) {
+    playTone(S, out, tt, 'koto', midi, vel * (0.4 + Math.random() * 0.1), sd * 1.5, 0);
+  }
+}
+
+/** Стил-пэн: удар, а на долгих нотах (от o.roll шагов) — «ролл» частыми ударами по тридцать вторым. */
+function synthPan(S, out, t, dur, midi, vel, o, sd) {
+  playTone(S, out, t, 'pan', midi, vel, 0, 0);
+  if (!o.roll || dur < o.roll * sd) return;
+  const step = sd / 2;
+  for (let tt = t + step * 2; tt < t + dur - step; tt += step) {
+    playTone(S, out, tt, 'pan', midi, vel * (0.42 + Math.random() * 0.1), step * 1.6, 0);
+  }
+}
+
+/**
+ * Укулеле: бой по четырём струнам с разносом во времени. kind: x — вниз (снизу вверх),
+ * u — вверх (три верхние струны, тише), m — глушёный «чк».
+ */
+function strumUke(S, out, t, notes, vel, kind, gate) {
+  const strings = (notes.length < 4 ? notes.concat(notes[0] + 12) : notes.slice(0, 4)).sort((a, b) => a - b);
+  const up = kind === 'u';
+  const order = up ? strings.slice(1).reverse() : strings;
+  const len = kind === 'm' ? 0.06 : gate;
+  const v = vel * (up ? 0.7 : kind === 'm' ? 0.8 : 1);
+  order.forEach((m, i) => playTone(S, out, t + i * (up ? 0.009 : 0.013), 'uke', m, v * (1 - i * 0.06), len, 0));
+}
+
+/**
+ * Японская бамбуковая флейта (синобуэ / сякухати): треугольник + синус октавой выше, полоса
+ * шума дыхания с «чиффом» на атаке, подъезд к ноте снизу или форшлаг сверху (у связных нот —
+ * портаменто от предыдущей) и вибрато через detune, вступающее с задержкой.
+ * o: { breath, scoop (полутона), grace (доля нот с форшлагом), slide (с), vibCents, vibRate, attack, release, cutoff, mix2 }
+ */
+function synthFue(S, out, t, dur, midi, vel, o, glideFrom) {
+  const ctx = S.ctx;
+  const f = mtof(midi);
+  dur = Math.max(0.05, dur);
+  const end = t + dur;
+  const rel = o.release || 0.08;
+  const stopAt = end + rel * 3 + 0.02;
+  const a = osc(ctx, 'triangle', f, t);
+  const b = osc(ctx, 'sine', f * 2, t);
+  const bg = gainNode(ctx, o.mix2 || 0.2);
+  const lp = biquad(ctx, 'lowpass', o.cutoff || 4500, 0.7);
+  const g = gainNode(ctx, 0);
+  a.connect(lp);
+  b.connect(bg).connect(lp);
+  lp.connect(g).connect(out);
+  const nodes = [a, b, bg, lp, g];
+  const grace = !glideFrom && dur > 0.2 && Math.random() < (o.grace || 0);
+  for (const [ob, r] of [[a, 1], [b, 2]]) {
+    const p = ob.frequency;
+    if (glideFrom) {
+      p.setValueAtTime(glideFrom * r, t);
+      p.exponentialRampToValueAtTime(f * r, t + (o.slide || 0.05));
+    } else if (grace) {
+      // форшлаг: палец на мгновение открывает отверстие — нота на тон выше
+      p.setValueAtTime(f * r * 1.122, t);
+      p.setValueAtTime(f * r * 1.122, t + 0.03);
+      p.exponentialRampToValueAtTime(f * r, t + 0.042);
+    } else if (dur > 0.2) {
+      p.setValueAtTime(f * r * Math.pow(2, -(o.scoop || 1) / 12), t);
+      p.exponentialRampToValueAtTime(f * r, t + 0.06);
+    }
+  }
+  if (o.vibCents && dur > 0.25) {
+    const lfo = osc(ctx, 'sine', o.vibRate || 5.5, t);
+    const lg = gainNode(ctx, 0);
+    lg.gain.setValueAtTime(0, t + 0.18);
+    lg.gain.linearRampToValueAtTime(o.vibCents, t + Math.min(0.5, dur));
+    lfo.connect(lg);
+    lg.connect(a.detune);
+    lg.connect(b.detune);
+    lfo.start(t);
+    lfo.stop(stopAt);
+    nodes.push(lfo, lg);
+  }
+  const atk = o.attack || 0.035;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vel, t + atk);
+  g.gain.setTargetAtTime(vel * 0.85, t + atk, 0.12);
+  g.gain.setTargetAtTime(0, Math.max(end, t + atk + 0.001), rel / 3);
+  if (o.breath) {
+    const n = noiseSrc(S, t, dur + rel + 0.05);
+    const bp = biquad(ctx, 'bandpass', Math.min(f * 2, 8000), 0.9);
+    const ng = gainNode(ctx, 0);
+    ng.gain.setValueAtTime(0, t);
+    ng.gain.linearRampToValueAtTime(vel * o.breath * 2, t + 0.015);
+    ng.gain.setTargetAtTime(vel * o.breath * 0.5, t + 0.015, 0.04);
+    ng.gain.setTargetAtTime(0, end, rel / 3);
+    n.connect(bp).connect(ng).connect(out);
+    releaseOnEnd(n, [n, bp, ng]);
+  }
+  a.start(t);
+  b.start(t);
+  a.stop(stopAt);
+  b.stop(stopAt);
+  releaseOnEnd(a, nodes);
+}
+
+// Расстройка пил суперсо относительно o.detune (центы)
+const SAW_SPREAD = [-1, -0.45, 0, 0.5, 0.95];
+
+/**
+ * Суперсо — лид евробита: пять расстроенных пил (крайние разведены по стерео), яркий фильтр,
+ * портаменто и вибрато через detune. Пилы стартуют с микросдвигом — без общего пика на атаке.
+ * o: { detune, cutoff, q, vibCents, vibRate, attack, sustain, release }
+ */
+function synthSupersaw(S, out, t, dur, midi, vel, o, glideFrom) {
+  const ctx = S.ctx;
+  const f = mtof(midi);
+  dur = Math.max(0.05, dur);
+  const end = t + dur;
+  const rel = o.release || 0.08;
+  const stopAt = end + rel * 3 + 0.02;
+  const lp = biquad(ctx, 'lowpass', o.cutoff * 1.6, o.q || 0.8);
+  lp.frequency.setValueAtTime(o.cutoff * 1.6, t);
+  lp.frequency.setTargetAtTime(o.cutoff, t, 0.12);
+  const g = gainNode(ctx, 0);
+  const pl = stereo(ctx, -0.6);
+  const pr = stereo(ctx, 0.6);
+  const nodes = [lp, g];
+  if (pl) {
+    pl.connect(lp);
+    pr.connect(lp);
+    nodes.push(pl, pr);
+  }
+  lp.connect(g).connect(out);
+  let lg = null;
+  if (o.vibCents && dur > 0.2) {
+    const lfo = osc(ctx, 'sine', o.vibRate || 5.8, t);
+    lg = gainNode(ctx, 0);
+    lg.gain.setValueAtTime(0, t + 0.15);
+    lg.gain.linearRampToValueAtTime(o.vibCents, t + Math.min(0.45, dur));
+    lfo.connect(lg);
+    lfo.start(t);
+    lfo.stop(stopAt);
+    nodes.push(lfo, lg);
+  }
+  const saws = SAW_SPREAD.map((k, i) => {
+    const s = osc(ctx, 'sawtooth', f, t);
+    s.detune.setValueAtTime(k * o.detune, t);
+    if (glideFrom) {
+      s.frequency.setValueAtTime(glideFrom, t);
+      s.frequency.exponentialRampToValueAtTime(f, t + 0.045);
+    }
+    if (lg) lg.connect(s.detune);
+    s.connect(i < 2 && pl ? pl : i > 2 && pr ? pr : lp);
+    s.start(t + i * 0.0011);
+    s.stop(stopAt);
+    nodes.push(s);
+    return s;
+  });
+  const atk = o.attack || 0.008;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vel, t + atk);
+  g.gain.setTargetAtTime(vel * (o.sustain || 0.85), t + atk, 0.15);
+  g.gain.setTargetAtTime(0, Math.max(end, t + atk + 0.001), rel / 3);
+  releaseOnEnd(saws[0], nodes);
+}
+
+// ---------------------------------------------------------------------------
 // Music themes (pure data)
 //
 // chords : one entry per bar, a symbol or [firstHalf, secondHalf]
@@ -683,7 +1188,15 @@ function synthLead(S, out, t, dur, midi, vel, o, glideFrom) {
 //   kick/snare: x = hit, o = ghost   hat: x accent, h soft, o open
 //   bass: R root(slash bass), O octave, 5 fifth, '-' hold, '.' rest
 //   chord/arp: x = hit
+//   riff: как bass, но инструментом def.riff на def.riff.octave выше (сямисэн)
+//   chord: у укулеле x — бой вниз, u — вверх, m — глушёный; у стабов o — оркестровый удар
+//   taiko/ka/clack/kane/conga/bongo: x удар, o тихий, l низкий барабан
+//   gliss: x — глиссандо кото по ладу def.gliss вверх, d — вниз
+//   altLead: true — мелодию секции играет def.altLead вместо def.lead
 // extra  : layers added by setMusicIntensity(1) (plus lead doubled an octave up)
+// lead.kind: fue (синобуэ), supersaw, pan (стил-пэн), koto, иначе synthLead;
+// lead.double — интервал дублирования мелодии на финальном круге (по умолчанию +12).
+// snareKind / hatKind — замена сэмпла малого барабана / хэта (gsnare, shaker).
 // ---------------------------------------------------------------------------
 
 const THEMES = {
@@ -752,195 +1265,278 @@ const THEMES = {
     extra: { hat: '..h...h...h...h.' },
   },
 
-  // Cheerful energetic J-pop racing theme (D major). Verse I–V–vi–IV,
-  // chorus on the "royal road" IV–V–iii–vi.
+  // «Сакура-Долина» — вафу-поп-рок, 152 BPM, ля минор с японским ладом ин (A–B–C–E–F,
+  // мияко-буси от ми). A: кото ведёт мотив народной «Сакура-сакура» под тайко и рифф сямисэна;
+  // B: куплет синобуэ, кото арпеджирует, атаригане на долях; C: припев на «королевской дороге»
+  // IV–V–iii–vi с праздничным «тян-тики». Каждые 8 тактов — сбивка: дробь тайко, «тён-тён»
+  // хёсиги и глиссандо кото по ладу. Кадансы на Esus4 — ладовое «фа → ми».
   sakura: {
-    bpm: 150,
+    bpm: 152,
     swing: 0,
-    form: 'AAAAAAAABBBBBBBB',
+    form: 'AAAAAAAABBBBBBBBCCCCCCCC',
     padCenter: 62,
-    bassLow: 36,
+    bassLow: 33,
     chords: [
-      'D', 'A/C#', 'Bm', 'G', 'D', 'A/C#', 'Bm7', ['G', 'A'],
-      'Gmaj7', 'A', 'F#m7', 'Bm7', 'Gmaj7', 'A', 'Bm7', ['Em7', 'A'],
+      'Am', 'G', 'C', 'Dm', 'Fmaj7', 'G', 'Dm7', 'Esus4',
+      'Am', 'F', 'G', 'Em7', 'Am', 'F', 'G', 'Esus4',
+      'F', 'G', 'Em7', 'Am', 'F', 'G', 'Dm7', 'Esus4',
     ],
     melody: [
-      'F#5 . F#5 E5 F#5 - A5 -',
-      'E5 - C#5 - A4 - . A4',
-      'D5 . D5 C#5 D5 - F#5 -',
-      'E5 - D5 - B4 - . .',
-      'F#5 . F#5 E5 F#5 - A5 -',
-      'B5 - A5 - E5 - C#5 -',
-      'D5 - E5 - F#5 - A5 -',
-      'D5 - G5 - A5 - C#6 -',
-      'B5 - - A5 - B5 D6 -',
-      'C#6 - - B5 - A5 E5 -',
-      'A5 - - F#5 - A5 C#6 -',
-      'D6 - - C#6 - B5 - .',
-      'B5 - - A5 - B5 D6 -',
-      'C#6 - - B5 - C#6 E6 -',
-      'D6 - - C#6 - B5 A5 -',
-      'B5 - A5 G5 A5 - . .',
+      'A4 - A4 - B4 - - -',
+      'A4 - A4 - B4 - - -',
+      'A4 - B4 - C5 - B4 -',
+      'A4 - B4 A4 F4 - - -',
+      'E4 - C4 - E4 - F4 -',
+      'E4 - E4 C4 B3 - - -',
+      'E4 - F4 - B4 A4 F4 -',
+      'E4 - - - - - . .',
+      'E5 - A5 - B5 - C6 B5',
+      'A5 - - - F5 - E5 -',
+      'D5 - E5 - G5 - A5 B5',
+      'B5 - - - - - . .',
+      'E5 - A5 - B5 - C6 E6',
+      'F6 - E6 - C6 - A5 -',
+      'B5 - D6 - B5 A5 G5 -',
+      'A5 - B5 - E5 - - -',
+      'A5 - C6 - E6 - - F6',
+      'E6 - D6 - B5 - - -',
+      'B5 - A5 - G5 - E5 -',
+      'A5 - - - - - C6 B5',
+      'A5 - C6 - E6 - F6 E6',
+      'D6 - - B5 - - G5 A5',
+      'F5 - A5 - C6 - B5 A5',
+      'F5 E5 - - - - . .',
     ],
-    lead: { wave: 'square', wave2: 'sawtooth', detune: 9, mix2: 0.55, cutoff: 3000, vibrato: 0.011, vibRate: 5.8, sustain: 0.75, release: 0.06, vel: 0.12, glide: true },
+    lead: { kind: 'fue', vel: 0.22, breath: 0.3, scoop: 1, grace: 0.3, slide: 0.05, vibCents: 22, vibRate: 5.6, attack: 0.035, release: 0.08, cutoff: 5000, mix2: 0.22, glide: true, double: -12 },
+    altLead: { kind: 'koto', vel: 0.85, trem: 6, double: -12 },
     bass: { kind: 'saw', vel: 0.44, gate: 0.8 },
-    pad: { vel: 0.03, attack: 0.06, release: 0.35, cut0: 900, cut1: 2300, cutTc: 0.25, detune: 12, sustain: 1 },
-    chord: { kind: 'stab', vel: 0.05, attack: 0.004, release: 0.12, cut0: 3800, cut1: 1100, cutTc: 0.06, detune: 9, sustain: 0.6, maxGate: 0.12 },
-    arp: { kind: 'pluck', wave: 'sawtooth', vel: 0.045, decay: 0.07, bright: 3800, octave: 12, seq: [0, 1, 2, 3, 4, 3, 2, 1] },
-    mix: { lead: { d: 0.22, r: 0.18 }, arp: { d: 0.22, r: 0.15 } },
+    pad: { vel: 0.018, attack: 0.1, release: 0.4, cut0: 800, cut1: 1700, cutTc: 0.3, detune: 10, sustain: 1 },
+    riff: { kind: 'shamisen', vel: 0.55, octave: 24, gate: 0.9 },
+    arp: { kind: 'koto', vel: 0.26, octave: 12, seq: [0, 2, 1, 3, 2, 4, 3, 5] },
+    gliss: { scale: 'A B C E F', from: 'E4', to: 'E6', vel: 0.3 },
+    mix: { lead: { d: 0.2, r: 0.3 }, arp: { d: 0.18, r: 0.2 }, perc: { g: 0.25, r: 0.25 } },
     parts: {
       A: {
-        kick: 'x.....x...x.....',
+        kick: 'x.......x.x.....',
         snare: '....x.......x...',
         hat: 'x.h.x.h.x.h.x.h.',
+        taiko: 'x.........x.....',
+        ka: '......x.......x.',
         bass: 'R.R.R.R.R.R.R.O.',
-        chord: '..x...x...x...x.',
+        riff: 'R..R..R.O..R..5.',
         pad: true,
+        altLead: true,
       },
       B: {
+        kick: 'x.....x.x.......',
+        snare: '....x.......x...',
+        hat: 'x.hhx.hhx.hhx.hh',
+        kane: 'o...o...o...o...',
+        bass: 'R.R.R.RRR.R.R.OR',
+        riff: 'R.RO.RO.R.RO.R5O',
+        arp: 'x.x.x.x.x.x.x.x.',
+        pad: true,
+      },
+      C: {
         kick: 'x...x...x...x...',
         snare: '....x.......x...',
-        clap: '....x.......x...',
         hat: 'h.o.h.o.h.o.h.o.',
+        taiko: 'x.......x.......',
+        kane: 'x.oox.oox.oox.oo',
         bass: 'R.R.O.R.R.R.O.R.',
-        arp: 'xxxxxxxxxxxxxxxx',
+        riff: 'R.RO.RO.R.RO.R5O',
+        arp: 'x.x.x.x.x.x.x.x.',
         pad: true,
       },
       fill: {
-        kick: 'x...x...x...x.x.',
-        snare: '....x...x.x.xxxx',
-        hat: 'h.h.h.h.h.......',
+        kick: 'x.......x.......',
+        snare: '....x...........',
+        hat: 'x.h.x.h.........',
+        taiko: 'x.....x.x.x.xxxx',
+        ka: '..x..x..........',
+        clack: '............x.x.',
+        gliss: '........x.......',
       },
     },
-    extra: { hat: 'xhhhxhhhxhhhxhhh', arp: 'xxxxxxxxxxxxxxxx' },
+    extra: { hat: 'xhhhxhhhxhhhxhhh', ka: '..x...x...x...x.' },
   },
 
-  // Night-city eurobeat / synthwave (A minor, i–VI–III–VII), octave bass.
+  // «Неон-Токио» — классический евробит (как в Initial D), 155 BPM, ре минор: октавный бас
+  // с верхней нотой на слабых долях, суперсо-лид из пяти пил, медные стабы с «подъездом»
+  // и оркестровые удары, арпеджио шестнадцатыми, гейтированный клэп-снейр, тарелка в начале
+  // каждой секции и «насос» сайдчейна от бочки. Куплет i–VI–VII–i, предприпев iv–V,
+  // драматичный припев VI–VII–v–i с доминантой A7 перед повтором.
   neon: {
-    bpm: 140,
+    bpm: 155,
     swing: 0,
-    form: 'AAAAAAAABBBBBBBB',
-    padCenter: 64,
+    form: 'AAAAAAAABBBBBBBBCCCCCCCC',
+    padCenter: 62,
     bassLow: 33,
     pump: 0.5,
+    snareKind: 'gsnare',
     chords: [
-      'Am', 'F', 'C', 'G', 'Am', 'Fmaj7', 'C', 'G',
-      'Fmaj7', 'G', 'Em7', 'Am', 'Dm7', 'G', 'Esus4', 'E7',
+      'Dm', 'Bb', 'C', 'Dm', 'Dm', 'Bb', 'C', 'A7',
+      'Gm', 'A', 'Dm', 'Bb', 'Gm', 'A', 'Bb', ['C', 'A7'],
+      'Bb', 'C', 'Am', 'Dm', 'Bb', 'C', 'Asus4', 'A7',
     ],
     melody: [
-      'E5 A5 - B5 C6 - B5 A5',
-      '- - C6 - A5 - F5 -',
-      'E5 G5 - A5 C6 - A5 G5',
-      '- - B5 - D6 - B5 G5',
-      'E5 A5 - B5 C6 - B5 A5',
-      '- - C6 - D6 - E6 -',
-      '- - D6 C6 - G5 E5 -',
-      'D5 - G5 - B5 - D6 -',
-      'C6 - - - - - A5 C6',
-      'D6 - - - - - B5 D6',
-      'E6 - - D6 - - B5 -',
-      'C6 - - B5 - A5 - -',
-      'D6 - - C6 - A5 - C6',
-      'B5 - - D6 - G5 - B5',
-      'B5 - - A5 - B5 - E6',
-      '- - - D6 - B5 G#5 -',
+      'D5 - F5 - A5 - D6 -',
+      'C6 - Bb5 - A5 - F5 -',
+      'G5 - - E5 - G5 C6 -',
+      'A5 - - - - - . .',
+      'D5 - F5 - A5 - D6 E6',
+      'F6 - D6 - C6 - Bb5 -',
+      'C6 - - D6 - - E6 -',
+      'E6 - C#6 - A5 - . .',
+      'D5 - G5 - Bb5 - A5 G5',
+      'A5 - - - C#6 - E6 -',
+      'D6 - C6 - A5 - F5 -',
+      'F5 - - - D5 - . .',
+      'D5 - G5 - Bb5 - D6 -',
+      'E6 - - - C#6 - A5 -',
+      'D6 - - - F6 - D6 -',
+      'E6 - - - E6 - C#6 -',
+      'D6 - - - F6 - D6 -',
+      'E6 - - - G6 - E6 -',
+      'E6 - - - D6 - - - C6 - B5 - A5 - - -',
+      'A5 - - - - - D6 E6',
+      'F6 - - - D6 - F6 -',
+      'G6 - - - E6 - C6 -',
+      'D6 - - - E6 - D6 -',
+      'C#6 - - - E6 - . .',
     ],
-    lead: { wave: 'sawtooth', wave2: 'sawtooth', detune: 14, mix2: 0.8, cutoff: 3800, q: 1.5, vibrato: 0.012, vibRate: 6, sustain: 0.8, release: 0.08, vel: 0.13, glide: true },
+    lead: { kind: 'supersaw', vel: 0.11, detune: 24, cutoff: 5200, q: 0.9, vibCents: 16, vibRate: 5.8, attack: 0.008, sustain: 0.85, release: 0.1, glide: true, double: -12 },
     bass: { kind: 'pluck', vel: 0.46, gate: 0.7 },
-    pad: { vel: 0.028, attack: 0.12, release: 0.4, cut0: 1200, cut1: 3200, cutTc: 0.4, detune: 16, sustain: 1 },
-    chord: { kind: 'stab', vel: 0.045, attack: 0.004, release: 0.1, cut0: 4200, cut1: 1300, cutTc: 0.05, detune: 14, sustain: 0.6, maxGate: 0.1 },
-    arp: { kind: 'pluck', wave: 'square', vel: 0.04, decay: 0.065, bright: 3200, octave: 12, seq: [0, 2, 1, 3, 2, 4, 3, 5] },
-    mix: { lead: { d: 0.3, r: 0.2 }, arp: { d: 0.3, r: 0.12 } },
+    pad: { vel: 0.024, attack: 0.12, release: 0.4, cut0: 1200, cut1: 3000, cutTc: 0.4, detune: 16, sustain: 1 },
+    chord: { kind: 'brass', vel: 0.05, attack: 0.014, release: 0.14, cut0: 5500, cut1: 1500, cutTc: 0.09, detune: 12, sustain: 0.7, maxGate: 0.2, swell: 700, scoop: 45 },
+    arp: { kind: 'pluck', wave: 'sawtooth', vel: 0.065, decay: 0.06, bright: 4500, octave: 12, seq: [0, 1, 2, 3, 4, 5, 4, 3] },
+    mix: { lead: { d: 0.25, r: 0.2 }, arp: { d: 0.3, r: 0.12 }, chord: { d: 0.1, r: 0.22 } },
     parts: {
       A: {
         kick: 'x...x...x...x...',
-        clap: '....x.......x...',
-        hat: 'h.o.h.o.h.o.h.o.',
+        snare: '....x.......x...',
+        hat: '..o...o...o...o.',
         bass: 'R.O.R.O.R.O.R.O.',
-        chord: '..x...x...x...x.',
+        chord: '..........x..x..',
         arp: 'xxxxxxxxxxxxxxxx',
       },
       B: {
         kick: 'x...x...x...x...',
         snare: '....x.......x...',
-        clap: '....x.......x...',
         hat: 'hhohhhohhhohhhoh',
         bass: 'R.O.R.O.R.O.R.O.',
+        chord: 'x..x..x...x..x..',
+        arp: 'xxxxxxxxxxxxxxxx',
+        pad: true,
+      },
+      C: {
+        kick: 'x...x...x...x...',
+        snare: '....x.......x...',
+        hat: 'hhohhhohhhohhhoh',
+        bass: 'R.O.R.O.R.O.R.O.',
+        chord: 'o.....x.......x.',
         arp: 'xxxxxxxxxxxxxxxx',
         pad: true,
       },
       fill: {
         kick: 'x...x...x...x...',
         snare: '....x...x.x.xxxx',
-        clap: '....x...........',
         hat: 'h.o.h.o.........',
       },
     },
     extra: { hat: 'xhhhxhhhxhhhxhhh' },
   },
 
-  // Tropical-house / chill summer ending (Eb major, vi–IV–I–V), off-beat mallets.
+  // «Закатный Берег» — тропический грув, 114 BPM, фа мажор, лёгкий свинг. Мелодия — стил-пэн
+  // с «роллами» на долгих нотах, укулеле бьёт офф-биты (в припеве — калипсо-бой «вниз,
+  // вниз-вверх, вверх-вниз-вверх»), маримба, шейкер, конги и бонго, тёплый пэд и суб-бас.
+  // Куплет I–vi–ii–V, припев IV–I–V–vi, бридж vi–IV–I–V с бочкой-тресильо (3-3-2).
   sunset: {
-    bpm: 112,
+    bpm: 114,
     swing: 0.1,
-    form: 'AAAAAAAABBBBBBBB',
+    form: 'AAAAAAAABBBBBBBBCCCCCCCC',
     padCenter: 63,
-    bassLow: 36,
-    pump: 0.35,
+    bassLow: 34,
+    pump: 0.3,
     hatKind: 'shaker',
     chords: [
-      'Cm7', 'Abmaj7', 'Eb', 'Bb', 'Cm7', 'Abmaj7', 'Ebmaj7', 'Bb',
-      'Abmaj7', 'Bb', 'Gm7', 'Cm7', 'Fm7', 'Bb', 'Ebmaj7', 'Bb7sus4',
+      'Fmaj7', 'Dm7', 'Gm7', 'C7', 'Fmaj7', 'Dm7', 'Gm7', ['C7sus4', 'C7'],
+      'Bbmaj7', 'F', 'C', 'Dm7', 'Bbmaj7', 'F', 'Gm7', 'C7',
+      'Dm7', 'Bbmaj7', 'F', 'C', 'Dm7', 'Bbmaj7', 'Gm7', ['C7sus4', 'C7'],
     ],
     melody: [
-      '. . Eb5 F5 G5 - - -',
-      '. . Eb5 F5 G5 - C6 -',
-      'Bb5 - G5 - . F5 G5 -',
-      'F5 - - - D5 - - -',
-      '. . Eb5 F5 G5 - - -',
-      '. . Eb5 F5 G5 - Eb6 -',
-      'D6 - Bb5 - . G5 Bb5 -',
-      'C6 - Bb5 - F5 - . .',
-      'C6 - - Bb5 - - G5 -',
-      'F5 - - G5 - - Bb5 -',
-      'Bb5 - - D6 - - C6 -',
-      'Bb5 - - G5 - - - -',
-      'C6 - - Ab5 - - Bb5 C6',
-      'D6 - - C6 - - Bb5 -',
-      'G5 - - Bb5 - - D6 -',
-      'Eb6 - - - - - . .',
+      '. C5 F5 A5 - G5 A5 -',
+      'C6 - - A5 - F5 - -',
+      '. Bb5 A5 G5 - F5 G5 -',
+      'E5 - - - - - . .',
+      '. C5 F5 A5 - G5 A5 -',
+      'D6 - - C6 - A5 - F5',
+      'G5 - Bb5 - D6 - C6 Bb5',
+      'F5 - G5 - - - . .',
+      'D6 - - D6 - C6 D6 -',
+      'C6 - A5 - - - . F5',
+      'G5 - - G5 - E5 G5 -',
+      'A5 - - - - - . .',
+      'D6 - - D6 - C6 D6 -',
+      'F6 - - E6 - C6 - A5',
+      'Bb5 - A5 - G5 - F5 -',
+      'G5 - - - E5 - . .',
+      'A5 - F5 - A5 - C6 -',
+      'D6 - - - C6 - Bb5 -',
+      'A5 - C6 - F6 - E6 -',
+      'E6 - - - D6 - C6 -',
+      'D6 - - C6 - A5 - F5',
+      'F5 - - D5 - F5 - A5',
+      'Bb5 - - A5 - G5 - F5',
+      'G5 - - - - - . .',
     ],
-    lead: { wave: 'triangle', wave2: 'sine', ratio2: 2, mix2: 0.22, cutoff: 3200, vibrato: 0.008, vibRate: 5, attack: 0.03, sustain: 0.85, release: 0.1, breath: 0.28, vel: 0.22, glide: true },
-    bass: { kind: 'sub', vel: 0.55, gate: 0.9 },
-    pad: { vel: 0.022, attack: 0.3, release: 0.5, cut0: 600, cut1: 1400, cutTc: 0.4, detune: 9, sustain: 1 },
-    chord: { kind: 'marimba', vel: 0.05, decay: 0.14, octave: 12 },
-    arp: { kind: 'marimba', vel: 0.035, decay: 0.1, octave: 12, seq: [0, 1, 2, 3, 4, 3, 2, 1] },
-    mix: { lead: { d: 0.3, r: 0.3 }, chord: { d: 0.18, r: 0.2 }, arp: { d: 0.25, r: 0.2 } },
+    lead: { kind: 'pan', vel: 0.38, roll: 6, double: -12 },
+    bass: { kind: 'sub', vel: 0.5, gate: 0.9 },
+    pad: { vel: 0.02, attack: 0.3, release: 0.5, cut0: 600, cut1: 1400, cutTc: 0.4, detune: 9, sustain: 1 },
+    chord: { kind: 'uke', vel: 0.24, maxGate: 0.35 },
+    arp: { kind: 'marimba', vel: 0.05, decay: 0.12, seq: [0, 1, 2, 3, 4, 3, 2, 1] },
+    mix: { lead: { d: 0.28, r: 0.25 }, chord: { d: 0.08, r: 0.15 }, arp: { d: 0.2, r: 0.2 }, perc: { g: 0.25, r: 0.15 } },
     parts: {
       A: {
-        kick: 'x...x...x...x...',
+        kick: 'x.......x.......',
         clap: '....x.......x...',
-        hat: '..x...x...x...x.',
-        bass: 'R-.R..R.R-.R..O.',
+        hat: 'x.hhx.hhx.hhx.hh',
+        conga: 'o...x...o...x.xl',
+        bass: 'R-.R..5.R-.R..O.',
         chord: '..x...x...x...x.',
         pad: true,
       },
       B: {
         kick: 'x...x...x...x...',
         clap: '....x.......x...',
-        hat: '.hxh.hxh.hxh.hxh',
-        bass: 'R-.R..R.R-.R..O.',
-        chord: 'x..x..x...x..x..',
+        hat: 'xhhhxhhhxhhhxhhh',
+        conga: 'o...x...o...x.xl',
+        bongo: 'x.o.x.o.x.o.x.o.',
+        bass: 'R-.R..5.R-.R..O.',
+        chord: 'x...x.u...u.x.u.',
+        arp: 'x.x.x.x.x.x.x.x.',
+        pad: true,
+      },
+      C: {
+        kick: 'x..x..x.x..x..x.',
+        clap: '....x.......x...',
+        hat: 'x.hhx.hhx.hhx.hh',
+        conga: 'o.x.x.l.o.x.x.l.',
+        bongo: '..x...x...x...x.',
+        bass: 'R..R..R.R..R..O.',
+        chord: '..x.m.x...x.m.x.',
+        arp: 'x.xx.xx.x.xx.xx.',
         pad: true,
       },
       fill: {
         kick: 'x...x...x...x...',
         clap: '....x.......x...',
-        hat: '.hxh.hxh.hxh....',
-        tom: '........x..x..x.',
+        hat: 'x.hhx.hhx.......',
+        conga: '........x.xlx.ll',
+        bongo: '........xx.x....',
       },
     },
-    extra: { hat: 'hhxhhhxhhhxhhhxh', arp: 'x.xxx.xxx.xxx.xx' },
+    extra: { hat: 'hhxhhhxhhhxhhhxh', bongo: '..o...o...o...o.', arp: 'x.xxx.xxx.xxx.xx' },
   },
 
   // Short, loopable victory-lap disco groove (C major).
@@ -1039,9 +1635,9 @@ function parseBassPattern(str) {
 function gatesFor(str) {
   const out = new Array(16).fill(0);
   for (let s = 0; s < 16; s++) {
-    if (str[s] !== 'x') continue;
+    if (str[s] === '.') continue;
     let d = 1;
-    while (d < 16 && str[(s + d) % 16] !== 'x') d++;
+    while (d < 16 && str[(s + d) % 16] === '.') d++;
     out[s] = d;
   }
   return out;
@@ -1050,8 +1646,52 @@ function gatesFor(str) {
 function compilePart(p) {
   const r = Object.assign({}, p);
   if (p.bass) r.bassSeq = parseBassPattern(p.bass);
+  if (p.riff) r.riffSeq = parseBassPattern(p.riff);
   if (p.chord) r.chordGates = gatesFor(p.chord);
   return r;
+}
+
+/** Нота шаблона bass/riff для аккорда h: R — бас аккорда, O — октавой выше, 5 — квинта. */
+function patNote(kind, h) {
+  let m = h.bass;
+  if (kind === 'O') m += 12;
+  else if (kind === '5') {
+    m = h.root + 7;
+    if (m - h.bass > 12) m -= 12;
+  }
+  return m;
+}
+
+/** Тоны [инструмент, нота], которые понадобятся теме: плеер греет их заранее по одному за тик. */
+function themeTones(th) {
+  const def = th.def;
+  const keys = new Map();
+  const add = (kind, m) => {
+    if (kind === 'pan' || STRINGS[kind]) keys.set(kind + m, [kind, m]);
+  };
+  for (const [step, ev] of th.melody) {
+    const part = th.parts[def.form[step >> 4]];
+    const L = part.altLead && def.altLead ? def.altLead : def.lead;
+    add(L.kind, ev.midi);
+    add(L.kind, ev.midi + (L.double || 12));
+  }
+  for (const hb of th.harm) {
+    for (const h of hb) {
+      if (def.arp) for (const i of def.arp.seq) add(def.arp.kind, h.ext[i % h.ext.length]);
+      if (def.riff) for (const k of 'RO5') add(def.riff.kind, patNote(k, h) + def.riff.octave);
+      if (def.chord) for (const m of h.chordNotes.length < 4 ? h.chordNotes.concat(h.chordNotes[0] + 12) : h.chordNotes) add(def.chord.kind, m);
+    }
+  }
+  if (th.gliss) for (const m of th.gliss) add('koto', m);
+  return [...keys.values()];
+}
+
+/** Ноты лада g.scale ('A B C E F') от g.from до g.to — пробег для глиссандо. */
+function scaleRun(g) {
+  const pcs = g.scale.split(' ').map((n) => parseChord(n).root);
+  const out = [];
+  for (let m = parseNote(g.from); m <= parseNote(g.to); m++) if (pcs.includes(m % 12)) out.push(m);
+  return out;
 }
 
 const compiledThemes = new Map();
@@ -1096,7 +1736,9 @@ function compileTheme(name) {
     melody: parseMelody(def.melody),
     parts,
     extra: compilePart(def.extra || {}),
+    gliss: def.gliss ? scaleRun(def.gliss) : null,
   };
+  out.tones = themeTones(out);
   compiledThemes.set(name, out);
   return out;
 }
@@ -1114,9 +1756,12 @@ const CHANNELS = {
   arp: { g: 1.2, d: 0.28, r: 0.18 },
   lead: { g: 1.25, d: 0.24, r: 0.2 },
   lead2: { g: 1.25, d: 0.18, r: 0.2 },
+  riff: { g: 1, d: 0.12, r: 0.15 },
 };
 const PUMPED = ['pad', 'chord', 'arp'];
 const HAT_VEL = { x: 1, h: 0.55, o: 0.75 };
+// Символы партий перкуссии → [громкость, скорость воспроизведения сэмпла]
+const PERC_HIT = { x: [1, 1], o: [0.45, 1], l: [0.9, 0.75] };
 
 // ---------------------------------------------------------------------------
 // MusicPlayer: one playing theme (its own mixer, delay and fader)
@@ -1199,6 +1844,7 @@ class MusicPlayer {
     dr.delayTime.value = dt;
     this.stopTime = Infinity;
     this.lastLead = null;
+    this.warm = theme.tones.slice();
   }
 
   _applyTempo() {
@@ -1227,6 +1873,11 @@ class MusicPlayer {
 
   /** Called by the manager's timer: schedule every step that starts before `horizon`. */
   scheduleUntil(horizon, now) {
+    // по одному тону темы за тик заранее — без рывков, когда нота прозвучит впервые
+    if (this.warm.length && this.stopTime === Infinity) {
+      const [kind, m] = this.warm.shift();
+      toneBuffer(this.S, kind, m);
+    }
     if (this.nextTime < now - 0.08) {
       // Fell behind (throttled timer / hiccup): skip ahead but stay on the grid.
       const skip = Math.ceil((now - this.nextTime) / this.stepDur);
@@ -1241,12 +1892,12 @@ class MusicPlayer {
   }
 
   /** Plays a drum hit from the pre-rendered kit (falls back to live synthesis). */
-  _drum(kind, out, t, vel, freq) {
+  _drum(kind, out, t, vel, rate) {
     const kit = this.mgr._kit;
     const S = this.S;
     if (kit) {
       const name = kind === 'hat' && Math.random() < 0.5 ? 'hat2' : kind;
-      playBuffer(this.ctx, kit[name], out, t, vel, kind === 'tom' ? freq / TOM_BASE : 1);
+      playBuffer(this.ctx, kit[name], out, t, vel, rate);
       return;
     }
     if (kind === 'kick') drumKick(S, out, t, vel);
@@ -1256,7 +1907,11 @@ class MusicPlayer {
     else if (kind === 'openHat') drumHat(S, out, t, vel, true);
     else if (kind === 'shaker') drumShaker(S, out, t, vel);
     else if (kind === 'crash') drumCrash(S, out, t, vel);
-    else if (kind === 'tom') drumTom(S, out, t, vel, freq);
+    else if (kind === 'tom') drumTom(S, out, t, vel, TOM_BASE * rate);
+    else {
+      const d = DRUM_KIT.find((k) => k[0] === kind);
+      if (d) d[2](S, out, t, vel);
+    }
   }
 
   _hat(c, t, scale) {
@@ -1276,13 +1931,18 @@ class MusicPlayer {
     }
   }
 
-  _chord(t, gate, h) {
+  _chord(t, gate, h, hit) {
     const c = this.def.chord;
     const out = this.ch.chord.input;
     const S = this.S;
     if (c.kind === 'ep') synthEP(S, out, t, gate * 0.95, h.chordNotes, c.vel);
     else if (c.kind === 'marimba') for (const n of h.chordNotes) synthMarimba(S, out, t, n, c.vel, c.decay);
-    else synthChordSaw(S, out, t, Math.min(gate * 0.9, c.maxGate || 0.2), h.chordNotes, c.vel, c);
+    else if (c.kind === 'uke') strumUke(S, out, t, h.chordNotes, c.vel, hit, Math.min(gate * 0.95, c.maxGate || 0.4));
+    else if (hit === 'o') {
+      // оркестровый удар: тот же аккорд с басом октавой ниже, громче, с шумовой атакой
+      synthChordSaw(S, out, t, Math.min(gate * 0.9, 0.3), [h.chordNotes[0] - 12].concat(h.chordNotes), c.vel * 1.3, c);
+      sNoise(S, out, t, { type: 'bandpass', f: 2400, f1: 500, q: 0.7, a: 0.001, peak: c.vel * 4, dur: 0.14 });
+    } else synthChordSaw(S, out, t, Math.min(gate * 0.9, c.maxGate || 0.2), h.chordNotes, c.vel, c);
   }
 
   _arp(t, midi) {
@@ -1290,7 +1950,29 @@ class MusicPlayer {
     const out = this.ch.arp.input;
     if (a.kind === 'bell') synthBell(this.S, out, t, mtof(midi), a.vel, a.decay, a.partials || 3);
     else if (a.kind === 'marimba') synthMarimba(this.S, out, t, midi, a.vel, a.decay);
+    else if (a.kind === 'koto') playTone(this.S, out, t, 'koto', midi, a.vel, this.stepDur * 3, -30);
     else synthPluck(this.S, out, t, midi, a.vel, a);
+  }
+
+  /** Глиссандо кото по ладу темы (сбивки): пробег вверх или вниз (down) за четверть такта. */
+  _gliss(t, down) {
+    const notes = this.th.gliss;
+    const G = this.def.gliss;
+    const dt = (this.stepDur * 4) / notes.length;
+    for (let i = 0; i < notes.length; i++) {
+      const m = notes[down ? notes.length - 1 - i : i];
+      playTone(this.S, this.ch.arp.input, t + i * dt, 'koto', m, G.vel * (0.6 + (0.4 * i) / notes.length), 0.35, 0);
+    }
+  }
+
+  /** Мелодия голосом из настроек L (kind выбирает инструмент). */
+  _lead(out, t, dur, midi, vel, L, glide) {
+    const S = this.S;
+    if (L.kind === 'fue') synthFue(S, out, t, dur, midi, vel, L, glide);
+    else if (L.kind === 'supersaw') synthSupersaw(S, out, t, dur, midi, vel, L, glide);
+    else if (L.kind === 'pan') synthPan(S, out, t, dur, midi, vel, L, this.stepDur);
+    else if (L.kind === 'koto') synthKoto(S, out, t, dur, midi, vel, L, this.stepDur);
+    else synthLead(S, out, t, dur, midi, vel, L, glide);
   }
 
   _scheduleStep(step, t0) {
@@ -1326,7 +2008,7 @@ class MusicPlayer {
       if (def.pump) this._pump(t);
     }
     c = dr.snare && dr.snare[s];
-    if (c === 'x' || c === 'o') this._drum('snare', ch.snare.input, t, (c === 'x' ? 1 : 0.4) * (fill ? 0.5 + (0.5 * s) / 15 : 1));
+    if (c === 'x' || c === 'o') this._drum(def.snareKind || 'snare', ch.snare.input, t, (c === 'x' ? 1 : 0.4) * (fill ? 0.5 + (0.5 * s) / 15 : 1));
     c = dr.clap && dr.clap[s];
     if (c === 'x') this._drum('clap', ch.clap.input, t, 1);
     c = dr.hat && dr.hat[s];
@@ -1336,30 +2018,35 @@ class MusicPlayer {
       if (c && c !== '.') this._hat(c, t, 0.7);
     }
     c = dr.tom && dr.tom[s];
-    if (c === 'x') this._drum('tom', ch.perc.input, t, 1.2, 250 - s * 8);
+    if (c === 'x') this._drum('tom', ch.perc.input, t, 1.2, (250 - s * 8) / TOM_BASE);
+    for (const name of PERC) {
+      c = dr[name] && dr[name][s];
+      if ((!c || c === '.') && inten && th.extra[name]) c = th.extra[name][s];
+      const hit = c && PERC_HIT[c];
+      if (hit) this._drum(name, ch.perc.input, t, hit[0], hit[1]);
+    }
 
     // --- harmony
     const hb = th.harm[bar];
     const h = hb.length > 1 && s >= hb[1].from ? hb[1] : hb[0];
 
     const bs = part.bassSeq && part.bassSeq[s];
-    if (bs) {
-      let m = h.bass;
-      if (bs.kind === 'O') m += 12;
-      else if (bs.kind === '5') {
-        m = h.root + 7;
-        if (m - h.bass > 12) m -= 12;
-      }
-      synthBass(S, ch.bass.input, t, bs.len * sd * (def.bass.gate || 0.85), m, def.bass.vel, def.bass.kind);
+    if (bs) synthBass(S, ch.bass.input, t, bs.len * sd * (def.bass.gate || 0.85), patNote(bs.kind, h), def.bass.vel, def.bass.kind);
+
+    const rs = part.riffSeq && part.riffSeq[s];
+    if (rs && def.riff) {
+      const R = def.riff;
+      playTone(S, ch.riff.input, t, R.kind, patNote(rs.kind, h) + R.octave, R.vel * (s % 4 ? 0.75 : 1), rs.len * sd * (R.gate || 0.9), 20);
     }
 
     if (part.pad && def.pad && s === h.from) {
       synthChordSaw(S, ch.pad.input, t, h.len * sd + 0.03, h.voicing, def.pad.vel, def.pad);
     }
 
-    if (part.chord && def.chord && part.chord[s] === 'x') {
+    const cc = part.chord && part.chord[s];
+    if (cc && cc !== '.' && def.chord) {
       const gate = Math.min(part.chordGates[s], h.from + h.len - s) * sd;
-      this._chord(t, gate, h);
+      this._chord(t, gate, h, cc);
     }
 
     const arpPat = part.arp || (inten ? th.extra.arp : null);
@@ -1368,18 +2055,24 @@ class MusicPlayer {
       this._arp(t, h.ext[seq[s % seq.length] % h.ext.length]);
     }
 
+    c = dr.gliss && dr.gliss[s];
+    if ((c === 'x' || c === 'd') && th.gliss) this._gliss(t, c === 'd');
+
     // --- melody
     const ev = th.melody.get(step);
     if (ev) {
-      const L = def.lead;
+      const L = part.altLead && def.altLead ? def.altLead : def.lead;
       const dur = ev.len * sd - 0.012;
       const prev = this.lastLead;
       let glide = null;
       if (L.glide && prev && prev.midi !== ev.midi && Math.abs(prev.end - t) < 0.03 && Math.abs(ev.midi - prev.midi) <= 7) {
         glide = mtof(prev.midi);
       }
-      synthLead(S, ch.lead.input, t, dur, ev.midi, L.vel, L, glide);
-      if (inten) synthLead(S, ch.lead2.input, t, dur, ev.midi + 12, L.vel * 0.3, L, glide ? glide * 2 : null);
+      this._lead(ch.lead.input, t, dur, ev.midi, L.vel, L, glide);
+      if (inten) {
+        const dbl = L.double || 12;
+        this._lead(ch.lead2.input, t, dur, ev.midi + dbl, L.vel * 0.3, L, glide ? glide * Math.pow(2, dbl / 12) : null);
+      }
       this.lastLead = { midi: ev.midi, end: t + ev.len * sd };
     }
   }
@@ -1875,7 +2568,7 @@ export class AudioManager {
   _init() {
     const ctx = new this._AC({ latencyHint: 'interactive' });
     this.ctx = ctx;
-    this.S = { ctx, noise: makeNoiseBuffer(ctx, 2) };
+    this.S = { ctx, noise: makeNoiseBuffer(ctx, 2), tones: new Map() };
 
     this.master = gainNode(ctx, this._muted ? 0 : MASTER_LEVEL);
     this.comp = ctx.createDynamicsCompressor();
@@ -2033,6 +2726,7 @@ export class AudioManager {
       }
     }
     if (this._players.length) {
+      const n = this._players.length;
       this._players = this._players.filter((p) => {
         if (p.stopTime !== Infinity && now > p.stopTime + 0.3) {
           p.dispose();
@@ -2040,6 +2734,12 @@ export class AudioManager {
         }
         return true;
       });
+      if (this._players.length < n) {
+        // тема отзвучала — её тоны больше не нужны, освобождаем память
+        const keep = new Set();
+        for (const p of this._players) for (const [k, m] of p.th.tones) keep.add(k + m);
+        for (const key of this.S.tones.keys()) if (!keep.has(key)) this.S.tones.delete(key);
+      }
     }
     if (!this._players.length && this._timer) {
       clearInterval(this._timer);
