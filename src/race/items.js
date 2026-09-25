@@ -118,7 +118,7 @@ const shieldFrag = /* glsl */ `
   varying vec3 vV;
   varying vec3 vP;
   void main() {
-    float f = 1.0 - abs(dot(normalize(vN), normalize(vV)));
+    float f = clamp(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0);
     // гексагональная сетка по сферическим координатам
     vec3 p = normalize(vP);
     vec2 uv = vec2(atan(p.z, p.x) * 3.0, p.y * 6.0);

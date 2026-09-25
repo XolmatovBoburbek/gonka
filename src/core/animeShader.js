@@ -1,10 +1,13 @@
-// Финальный "аниме"-проход: манга-линии скорости, вспышки, виньетка, хроматическая аберрация, насыщенность.
+// Финальный (единственный полноэкранный) проход: bloom-сложение, тонмаппинг, sRGB и "аниме"-эффекты —
+// манга-линии скорости, вспышки, виньетка, хроматическая аберрация, насыщенность.
 import * as THREE from 'three';
 
 export const AnimeShader = {
   name: 'AnimeShader',
   uniforms: {
-    tDiffuse: { value: null },
+    tDiffuse: { value: null }, // линейный HDR-кадр сцены
+    tBloom: { value: null },
+    uBloom: { value: 0 }, // 0 — bloom выключен
     uTime: { value: 0 },
     uSpeed: { value: 0 },
     uSpeedColor: { value: new THREE.Color(1, 1, 1) },
@@ -27,6 +30,8 @@ export const AnimeShader = {
   `,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
+    uniform sampler2D tBloom;
+    uniform float uBloom;
     uniform float uTime;
     uniform float uSpeed;
     uniform vec3 uSpeedColor;
@@ -47,6 +52,13 @@ export const AnimeShader = {
       return fract((p3.x + p3.y) * p3.z);
     }
 
+    vec3 hdr(vec2 p) {
+      vec3 c = texture2D(tDiffuse, p).rgb;
+      if (uBloom > 0.0) c += texture2D(tBloom, p).rgb;
+      // NaN/Inf-пиксель (капризы драйвера) — просто чёрная точка, а не отравленная картинка
+      return (any(isnan(c)) || any(isinf(c))) ? vec3(0.0) : c;
+    }
+
     void main() {
       vec2 uv = vUv;
       vec2 d = uv - uCenter;
@@ -56,12 +68,13 @@ export const AnimeShader = {
       vec3 col;
       if (uAberration > 0.0005) {
         vec2 off = d * uAberration * r;
-        col.r = texture2D(tDiffuse, uv + off).r;
-        col.g = texture2D(tDiffuse, uv).g;
-        col.b = texture2D(tDiffuse, uv - off).b;
+        col = vec3(hdr(uv + off).r, hdr(uv).g, hdr(uv - off).b);
       } else {
-        col = texture2D(tDiffuse, uv).rgb;
+        col = hdr(uv);
       }
+      // тонмаппинг и перевод в sRGB (функции three подставляет в шейдер при рендере на экран)
+      col = toneMapping(col);
+      col = linearToOutputTexel(vec4(col, 1.0)).rgb;
 
       float l = dot(col, vec3(0.299, 0.587, 0.114));
       col = mix(vec3(l), col, uSaturation);

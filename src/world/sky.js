@@ -99,8 +99,8 @@ const skyFragment = /* glsl */ `
     }
 
     // луна
-    if (uMoonSize > 0.0) {
-      float md = dot(d, uMoonDir);
+    float md = dot(d, uMoonDir);
+    if (uMoonSize > 0.0 && md > 0.95) { // дальше гало < 1e-4 — не тратим шум на всё небо
       float moon = smoothstep(cos(uMoonSize), cos(uMoonSize * 0.93), md);
       vec3 mperp = normalize(cross(uMoonDir, vec3(0.0, 1.0, 0.0)));
       vec2 muv = vec2(dot(d, mperp), d.y - uMoonDir.y) / uMoonSize;
@@ -182,7 +182,7 @@ export function createSky(opts = {}) {
   const geo = new THREE.SphereGeometry(1000, 48, 24);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
-  mesh.renderOrder = -10;
+  mesh.renderOrder = 10; // после непрозрачных: early-z отбрасывает закрытое небо (дорогой шейдер облаков)
   mesh.name = 'sky';
   mesh.userData.update = (dt, camera) => {
     uniforms.uTime.value += dt;

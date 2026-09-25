@@ -190,16 +190,15 @@ const bFrag = /* glsl */ `
 `;
 
 /**
- * Все здания города — один InstancedMesh с процедурным фасадом.
+ * Все здания города — InstancedMesh-чанки с общим процедурным фасадом: ближние — по клеткам 240 м,
+ * дальнее кольцо — по 8 секторам. Чанки отсекаются по фрустуму (и в проходе теней), а three сортирует их
+ * спереди назад — закрытые фасады не шейдятся зря.
  * list: [{x, y, z, w, d, h, ry, color, type(0 офис|1 жилой|2 стекло), crown, lit(0..1), hue(0..6), seed}]
  */
 export function makeBuildings(list, { moonDir, moon = 0x8a90d8, ambient = 0x4a4270 } = {}) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
   geo.translate(0, 0.5, 0);
   geo.deleteAttribute('uv');
-  const n = list.length;
-  const info = new Float32Array(n * 4);
-  const cols = new Float32Array(n * 3);
   const c = new THREE.Color();
   const mat = new THREE.ShaderMaterial({
     uniforms: fogUniforms({
@@ -214,26 +213,51 @@ export function makeBuildings(list, { moonDir, moon = 0x8a90d8, ambient = 0x4a42
     fragmentShader: bFrag,
     fog: true,
   });
-  const im = new THREE.InstancedMesh(geo, mat, n);
+
+  let cx = 0;
+  let cz = 0;
+  for (const b of list) {
+    cx += b.x / list.length;
+    cz += b.z / list.length;
+  }
+  const buckets = new Map();
+  list.forEach((b, i) => {
+    const far = Math.hypot(b.x - cx, b.z - cz) > 560;
+    const key = far ? `f${Math.floor(((Math.atan2(b.z - cz, b.x - cx) + Math.PI) / (Math.PI * 2)) * 8) % 8}` : `${Math.floor(b.x / 240)},${Math.floor(b.z / 240)}`;
+    if (!buckets.has(key)) buckets.set(key, { far, items: [] });
+    buckets.get(key).items.push([b, i]); // исходный индекс — запасной seed фасада
+  });
+
+  const group = new THREE.Group();
+  group.name = 'buildings';
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0);
-  list.forEach((b, i) => {
-    q.setFromAxisAngle(up, b.ry || 0);
-    m.compose(new THREE.Vector3(b.x, b.y ?? -0.3, b.z), q, new THREE.Vector3(b.w, b.h, b.d));
-    im.setMatrixAt(i, m);
-    info.set([Math.floor(b.seed ?? i * 7.3) % 1000, (b.type ?? 0) + (b.crown ? 4 : 0), b.lit ?? 0.5, b.hue ?? 0], i * 4);
-    c.set(b.color ?? 0x2a2a48);
-    cols.set([c.r, c.g, c.b], i * 3);
-  });
-  geo.setAttribute('aInfo', new THREE.InstancedBufferAttribute(info, 4));
-  geo.setAttribute('aColor', new THREE.InstancedBufferAttribute(cols, 3));
-  im.castShadow = true;
-  im.receiveShadow = false;
-  im.computeBoundingSphere();
-  im.name = 'buildings';
-  im.userData.noShadow = true;
-  return im;
+  for (const { far, items } of buckets.values()) {
+    const g = new THREE.BufferGeometry();
+    g.setIndex(geo.index);
+    g.setAttribute('position', geo.getAttribute('position'));
+    g.setAttribute('normal', geo.getAttribute('normal'));
+    const info = new Float32Array(items.length * 4);
+    const cols = new Float32Array(items.length * 3);
+    const im = new THREE.InstancedMesh(g, mat, items.length);
+    items.forEach(([b, i], k) => {
+      q.setFromAxisAngle(up, b.ry || 0);
+      m.compose(new THREE.Vector3(b.x, b.y ?? -0.3, b.z), q, new THREE.Vector3(b.w, b.h, b.d));
+      im.setMatrixAt(k, m);
+      info.set([Math.floor(b.seed ?? i * 7.3) % 1000, (b.type ?? 0) + (b.crown ? 4 : 0), b.lit ?? 0.5, b.hue ?? 0], k * 4);
+      c.set(b.color ?? 0x2a2a48);
+      cols.set([c.r, c.g, c.b], k * 3);
+    });
+    g.setAttribute('aInfo', new THREE.InstancedBufferAttribute(info, 4));
+    g.setAttribute('aColor', new THREE.InstancedBufferAttribute(cols, 3));
+    im.castShadow = !far; // дальнее кольцо никогда не попадает в коробку теней
+    im.receiveShadow = false;
+    im.computeBoundingSphere();
+    im.userData.noShadow = true;
+    group.add(im);
+  }
+  return group;
 }
 
 // ------------------------------------------------------------------ атлас неоновых вывесок
@@ -998,7 +1022,7 @@ const beamFrag = /* glsl */ `
   varying float vT;
   varying float vEdge;
   void main() {
-    float a = uAlpha * pow(vEdge, 1.5) * (1.0 - vT) * smoothstep(0.0, 0.04, vT);
+    float a = uAlpha * pow(max(vEdge, 0.0), 1.5) * (1.0 - vT) * smoothstep(0.0, 0.04, vT);
     gl_FragColor = vec4(uColor * a, 1.0);
   }
 `;

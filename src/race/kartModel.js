@@ -595,7 +595,7 @@ export class KartView {
 
     // ---- корпус
     const pb = new PartBuilder();
-    const rb = (w, h, d, r, pos, rot = null, seg = 3) => {
+    const rb = (w, h, d, r, pos, rot = null, seg = 2) => {
       const g = new RoundedBoxGeometry(w, h, d, seg, r);
       if (rot) g.rotateX(rot[0] || 0).rotateY(rot[1] || 0).rotateZ(rot[2] || 0);
       g.translate(...pos);
@@ -662,7 +662,8 @@ export class KartView {
     pb.add('kartAccent', charm);
 
     const glowKeys = ['headlight', 'tail'];
-    this.body.add(pb.buildColored(pal, this.colorMat, { exclude: glowKeys }));
+    const chassis = pb.buildColored(pal, this.colorMat, { exclude: glowKeys });
+    this.body.add(chassis);
     const lampGeo = [];
     for (const k of glowKeys) lampGeo.push(paint(pb.merged(k), k === 'headlight' ? 0xfff4c8 : 0xff3050));
     const lamps = new THREE.Mesh(mergeGeometries(lampGeo), new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(2.4, 2.4, 2.4) }));
@@ -694,7 +695,7 @@ export class KartView {
       wpb.add('tire', tire).add('kartAccent', hub).add('metal', cap);
       // спица-маркер, чтобы было видно вращение
       wpb.add('body', new THREE.BoxGeometry(wd.w * 0.9, wd.r * 0.95, 0.07));
-      const tm = wpb.buildColored(pal, this.colorMat);
+      const tm = wpb.buildColored(pal, this.colorMat, { castShadow: false });
       spin.add(tm);
       spin.add(new THREE.Mesh(outlineGeometry(tire), outlineMaterial(OUTLINE, 0.03)));
       this.body.add(steer);
@@ -733,7 +734,8 @@ export class KartView {
     const neck = new THREE.CylinderGeometry(0.07, 0.08, 0.14, 10);
     neck.translate(0, 1.24, -0.04);
     dp.add('skin', neck);
-    this.driver.add(dp.buildColored(pal, this.colorMat));
+    const driverMesh = dp.buildColored(pal, this.colorMat);
+    this.driver.add(driverMesh);
     const torsoOutline = new THREE.Mesh(outlineGeometry(dp.allMerged()), outlineMaterial(OUTLINE, 0.028));
     this.driver.add(torsoOutline);
 
@@ -756,7 +758,7 @@ export class KartView {
     }
     const swing = buildHair(char, hp, this.head);
     buildAccessory(char, hp);
-    this.head.add(hp.buildColored(pal, this.colorMat, { exclude: ['glass'] }));
+    this.head.add(hp.buildColored(pal, this.colorMat, { exclude: ['glass'], castShadow: false }));
     if (hp.has('glass')) this.head.add(new THREE.Mesh(hp.merged('glass'), mats.glass));
     // один контур на голову + волосы
     const headOl = normalizeGeometry(headGeo.clone());
@@ -767,7 +769,7 @@ export class KartView {
     for (const s of swing) {
       const spb = new PartBuilder();
       for (const [k, arr] of Object.entries(s.geos)) for (const g of arr) spb.add(k, g);
-      s.pivot.add(spb.buildColored(pal, this.colorMat));
+      s.pivot.add(spb.buildColored(pal, this.colorMat, { castShadow: false }));
       const ol = new THREE.Mesh(outlineGeometry(spb.allMerged()), outlineMaterial(OUTLINE, 0.022));
       s.pivot.add(ol);
       this.head.add(s.pivot);
@@ -811,6 +813,8 @@ export class KartView {
     this.blob.position.y = 0.03;
     this.blob.renderOrder = 1;
     this.root.add(this.blob);
+    // в карту теней — только крупные силуэты (колёса и волосы там почти не видны, а каждый меш = лишний проход)
+    this.shadowCasters = [chassis, driverMesh, headMesh];
 
     // точки эмиссии искр дрифта (локальные)
     this.sparkPoints = [new THREE.Vector3(0.84, 0.05, -0.95), new THREE.Vector3(-0.84, 0.05, -0.95)];
@@ -830,11 +834,14 @@ export class KartView {
 
     this.root.traverse((o) => {
       if (o.isMesh && !o.userData.isOutline && o !== this.blob) o.castShadow = o.castShadow || false;
+      // контуры — после непрозрачных: early-z отбрасывает закрытую часть оболочки
+      if (o.material && o.material.userData && o.material.userData.outline) o.renderOrder = Math.max(o.renderOrder, 1);
     });
   }
 
   setShadowMode(realShadows) {
     this.blob.visible = !realShadows;
+    for (const m of this.shadowCasters) m.castShadow = realShadows;
   }
 
   setExpression(expr, duration = 0) {

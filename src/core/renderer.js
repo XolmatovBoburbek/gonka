@@ -1,49 +1,137 @@
-// Рендерер + пост-обработка (bloom, тонмаппинг, аниме-проход) и адаптивное качество.
+// Рендерер: сцена → MSAA HalfFloat RT (1 resolve) → bloom-мипы (без blend) → ОДИН финальный проход на экран
+// (bloom-сложение + тонмаппинг + аниме-эффекты). Канвас без MSAA и глубины: сглаживание — в RT сцены.
+// Уровни качества (applyLevel) меняются на лету без перекомпиляции шейдеров.
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { AnimeShader } from './animeShader.js';
 
+// pixelBudget — максимум пикселей буфера (на HiDPI-экранах не рисуем 4–8 млн пикселей).
 export const QUALITY_PRESETS = {
-  low: { label: 'Низкое', maxPixelRatio: 1, shadows: false, shadowSize: 512, post: false, bloom: false, msaa: 0, particles: 0.45, detail: 0.55 },
-  medium: { label: 'Среднее', maxPixelRatio: 1.35, shadows: true, shadowSize: 1024, post: true, bloom: true, msaa: 2, particles: 0.75, detail: 0.8 },
-  high: { label: 'Высокое', maxPixelRatio: 2, shadows: true, shadowSize: 2048, post: true, bloom: true, msaa: 4, particles: 1, detail: 1 },
+  low: { label: 'Низкое', pixelBudget: 1.0e6, maxPixelRatio: 1, shadows: false, shadowSize: 512, post: true, bloom: false, bloomScale: 0, msaa: 0, particles: 0.45, detail: 0.55 },
+  medium: { label: 'Среднее', pixelBudget: 2.1e6, maxPixelRatio: 1.35, shadows: true, shadowSize: 1024, post: true, bloom: true, bloomScale: 0.5, msaa: 2, particles: 0.75, detail: 0.8 },
+  high: { label: 'Высокое', pixelBudget: 3.7e6, maxPixelRatio: 2, shadows: true, shadowSize: 2048, post: true, bloom: true, bloomScale: 1, msaa: 4, particles: 1, detail: 1 },
 };
+
+// NaN/Inf из HDR-буфера bloom размазал бы на весь экран чёрным пятном — такие пиксели обнуляем на входе.
+const SAFE_TEXEL = /* glsl */ `vec4 texel = texture2D( tDiffuse, vUv );
+			if ( any( isnan( texel ) ) || any( isinf( texel ) ) ) texel = vec4( 0.0 );`;
+
+/** UnrealBloomPass без финального аддитивного смешивания в буфер сцены: результат — this.texture. */
+class BloomMips extends UnrealBloomPass {
+  constructor(...args) {
+    super(...args);
+    const m = this.materialHighPassFilter;
+    m.fragmentShader = m.fragmentShader.replace('vec4 texel = texture2D( tDiffuse, vUv );', SAFE_TEXEL);
+  }
+
+  render(renderer, writeBuffer, readBuffer) {
+    const fs = this._fsQuad;
+    renderer.getClearColor(this._oldClearColor);
+    this._oldClearAlpha = renderer.getClearAlpha();
+    const oldAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.setClearColor(this.clearColor, 0);
+
+    this.highPassUniforms.tDiffuse.value = readBuffer.texture;
+    this.highPassUniforms.luminosityThreshold.value = this.threshold;
+    fs.material = this.materialHighPassFilter;
+    renderer.setRenderTarget(this.renderTargetBright);
+    renderer.clear();
+    fs.render(renderer);
+
+    let input = this.renderTargetBright;
+    for (let i = 0; i < this.nMips; i++) {
+      const m = this.separableBlurMaterials[i];
+      fs.material = m;
+      m.uniforms.colorTexture.value = input.texture;
+      m.uniforms.direction.value = UnrealBloomPass.BlurDirectionX;
+      renderer.setRenderTarget(this.renderTargetsHorizontal[i]);
+      renderer.clear();
+      fs.render(renderer);
+      m.uniforms.colorTexture.value = this.renderTargetsHorizontal[i].texture;
+      m.uniforms.direction.value = UnrealBloomPass.BlurDirectionY;
+      renderer.setRenderTarget(this.renderTargetsVertical[i]);
+      renderer.clear();
+      fs.render(renderer);
+      input = this.renderTargetsVertical[i];
+    }
+
+    fs.material = this.compositeMaterial;
+    this.compositeMaterial.uniforms.bloomStrength.value = this.strength;
+    this.compositeMaterial.uniforms.bloomRadius.value = this.radius;
+    this.compositeMaterial.uniforms.bloomTintColors.value = this.bloomTintColors;
+    renderer.setRenderTarget(this.renderTargetsHorizontal[0]);
+    renderer.clear();
+    fs.render(renderer);
+
+    renderer.setClearColor(this._oldClearColor, this._oldClearAlpha);
+    renderer.autoClear = oldAutoClear;
+  }
+
+  get texture() {
+    return this.renderTargetsHorizontal[0].texture;
+  }
+}
+
+const _v2 = new THREE.Vector2();
 
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
-      powerPreference: 'high-performance',
+      antialias: false, // на канвас рисуется только полноэкранный проход — MSAA и глубина ему не нужны
+      depth: false,
       stencil: false,
+      powerPreference: 'high-performance',
     });
     const r = this.renderer;
+    r.debug.checkShaderErrors = !import.meta.env.PROD; // в сборке не ждём синхронно линковку шейдеров
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.NeutralToneMapping;
     r.toneMappingExposure = 1.0;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
+    r.shadowMap.autoUpdate = false; // обновляем сами — можно реже, чем каждый кадр
     r.setClearColor(0x000000, 1);
+
+    // без рендерящихся float-текстур (редкие драйверы/приватные профили) HDR-буфер был бы "неполным" — чёрный экран
+    const gl = r.getContext();
+    this.floatRT = r.extensions.has('EXT_color_buffer_float') || r.extensions.has('EXT_color_buffer_half_float');
+    this.maxSamples = 0;
+    if (this.floatRT) {
+      try {
+        const s = gl.getInternalformatParameter(gl.RENDERBUFFER, gl.RGBA16F, gl.SAMPLES);
+        this.maxSamples = s && s.length ? Math.max(...s) : 0;
+      } catch {
+        this.maxSamples = 0;
+      }
+    } else this.maxSamples = gl.getParameter(gl.MAX_SAMPLES) || 0;
 
     this.scene = null;
     this.camera = null;
-    this.composer = null;
+    this.sun = null;
+    this.sceneRT = null;
     this.bloomPass = null;
-    this.animePass = null;
     this.qualityName = 'high';
     this.quality = QUALITY_PRESETS.high;
+    // живые "ручки" качества — их двигает автонастройка (см. perf.js)
+    this.level = { scale: 1, msaa: 4, bloomScale: 1, shadows: true, shadowEvery: 1 };
     this.pixelRatio = 1;
-    this.dynamicScale = 1; // адаптивное разрешение
     this.bloom = { strength: 0.55, radius: 0.5, threshold: 1.3 };
     this.fx = { speed: 0, flash: 0, aberration: 0, vignette: 0.28, saturation: 1.06, contrast: 1.03 };
-    this._frameTimes = [];
-    this._adaptTimer = 0;
-    this.adaptive = true;
+    this.frameNo = 0;
+    this.finalMat = new THREE.ShaderMaterial({
+      name: 'AnimeFinal',
+      uniforms: THREE.UniformsUtils.clone(AnimeShader.uniforms),
+      vertexShader: AnimeShader.vertexShader,
+      fragmentShader: AnimeShader.fragmentShader,
+      depthTest: false,
+      depthWrite: false,
+    });
+    this.finalQuad = new FullScreenQuad(this.finalMat);
+    this.animePass = { uniforms: this.finalMat.uniforms };
 
     this._onResize = () => this.resize();
     window.addEventListener('resize', this._onResize);
@@ -51,29 +139,46 @@ export class Renderer {
 
   setQuality(name) {
     this.qualityName = QUALITY_PRESETS[name] ? name : 'high';
-    this.quality = QUALITY_PRESETS[this.qualityName];
-    this.dynamicScale = 1;
-    this.renderer.shadowMap.enabled = this.quality.shadows;
-    this._rebuildComposer();
-    this.resize();
-    // пересобрать программы материалов, если поменялись тени
-    if (this.scene) {
+    const q = (this.quality = QUALITY_PRESETS[this.qualityName]);
+    const shadowsChanged = this.renderer.shadowMap.enabled !== q.shadows;
+    this.renderer.shadowMap.enabled = q.shadows;
+    this.applyLevel({ scale: 1, msaa: q.msaa, bloomScale: q.bloom ? q.bloomScale : 0, shadows: q.shadows, shadowEvery: 1 }, true);
+    // пересобрать программы материалов, если поменялось наличие теней
+    if (shadowsChanged && this.scene) {
       this.scene.traverse((o) => {
-        if (o.material) {
-          const mats = Array.isArray(o.material) ? o.material : [o.material];
-          mats.forEach((m) => (m.needsUpdate = true));
-        }
+        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => (m.needsUpdate = true));
       });
     }
   }
 
-  setView(scene, camera) {
+  /** Быстрая смена качества: разрешение, MSAA, bloom, частота теней. Шейдеры не перекомпилируются. */
+  applyLevel(l, force = false) {
+    const prev = this.level;
+    this.level = { ...prev, ...l };
+    const L = this.level;
+    const samples = Math.min(L.msaa, this.maxSamples);
+    if (this.sceneRT && this.sceneRT.samples !== samples) {
+      this.sceneRT.samples = samples;
+      this.sceneRT.dispose(); // пересоздастся при следующем setRenderTarget
+    }
+    if (L.bloomScale > 0 && !this.bloomPass) {
+      this.bloomPass = new BloomMips(new THREE.Vector2(2, 2), this.bloom.strength, this.bloom.radius, this.bloom.threshold);
+    }
+    this._applyShadowVisibility();
+    if (force || prev.scale !== L.scale || prev.bloomScale !== L.bloomScale) this.resize();
+  }
+
+  _applyShadowVisibility() {
+    // "выключить тени" без перекомпиляции: интенсивность 0 и карта не обновляется
+    if (this.sun && this.sun.shadow) this.sun.shadow.intensity = this.level.shadows ? 1 : 0;
+  }
+
+  setView(scene, camera, sun = null) {
     this.scene = scene;
     this.camera = camera;
-    if (this.renderPass) {
-      this.renderPass.scene = scene;
-      this.renderPass.camera = camera;
-    }
+    this.sun = sun;
+    this._applyShadowVisibility();
+    this.renderer.shadowMap.needsUpdate = true;
     this.resize();
   }
 
@@ -88,93 +193,86 @@ export class Renderer {
     }
   }
 
-  _rebuildComposer() {
-    if (this.composer) {
-      this.composer.renderTarget1.dispose();
-      this.composer.renderTarget2.dispose();
-      this.composer.passes.forEach((p) => p.dispose && p.dispose());
-      this.composer = null;
+  /** Прогрев шейдеров под настоящий буфер сцены (для экрана three собрал бы другие варианты программ). */
+  async prewarm(scene = this.scene, camera = this.camera) {
+    if (!scene || !camera) return;
+    const R = this.renderer;
+    const prev = R.getRenderTarget();
+    let done;
+    try {
+      R.setRenderTarget(this.sceneRT);
+      done = R.compileAsync(scene, camera);
+    } catch {
+      /* не критично */
+    } finally {
+      R.setRenderTarget(prev);
     }
-    this.bloomPass = null;
-    this.animePass = null;
-    this.renderPass = null;
-    if (!this.quality.post) return;
-
-    const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
-    const rt = new THREE.WebGLRenderTarget(Math.max(1, size.x), Math.max(1, size.y), {
-      type: THREE.HalfFloatType,
-      samples: this.quality.msaa,
-    });
-    const composer = new EffectComposer(this.renderer, rt);
-    this.renderPass = new RenderPass(this.scene || new THREE.Scene(), this.camera || new THREE.PerspectiveCamera());
-    composer.addPass(this.renderPass);
-    if (this.quality.bloom) {
-      this.bloomPass = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), this.bloom.strength, this.bloom.radius, this.bloom.threshold);
-      composer.addPass(this.bloomPass);
+    try {
+      await done;
+    } catch {
+      /* не критично */
     }
-    composer.addPass(new OutputPass());
-    this.animePass = new ShaderPass(AnimeShader);
-    composer.addPass(this.animePass);
-    this.composer = composer;
   }
 
   resize() {
     const w = Math.max(1, this.canvas.clientWidth || window.innerWidth);
     const h = Math.max(1, this.canvas.clientHeight || window.innerHeight);
-    const pr = Math.min(window.devicePixelRatio || 1, this.quality.maxPixelRatio) * this.dynamicScale;
-    this.pixelRatio = Math.max(0.5, pr);
-    this.renderer.setPixelRatio(this.pixelRatio);
-    this.renderer.setSize(w, h, false);
-    if (this.composer) {
-      this.composer.setPixelRatio(this.pixelRatio);
-      this.composer.setSize(w, h);
+    const q = this.quality;
+    const base = Math.min(window.devicePixelRatio || 1, q.maxPixelRatio, Math.sqrt(q.pixelBudget / (w * h)));
+    this.pixelRatio = Math.max(0.5, base * this.level.scale);
+    const R = this.renderer;
+    R.setPixelRatio(this.pixelRatio);
+    R.setSize(w, h, false);
+    const size = R.getDrawingBufferSize(_v2);
+    if (!this.sceneRT) {
+      this.sceneRT = new THREE.WebGLRenderTarget(size.x, size.y, {
+        type: this.floatRT ? THREE.HalfFloatType : THREE.UnsignedByteType,
+        samples: Math.min(this.level.msaa, this.maxSamples),
+      });
+      this.sceneRT.resolveDepthBuffer = false; // глубину после прохода сцены никто не читает
+    } else this.sceneRT.setSize(size.x, size.y);
+    if (this.bloomPass) {
+      const b = this.level.bloomScale || 1;
+      this.bloomPass.setSize(Math.max(4, Math.round(size.x * b)), Math.max(4, Math.round(size.y * b)));
     }
     if (this.camera) {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
     }
-    if (this.animePass) this.animePass.uniforms.uAspect.value = w / h;
+    this.finalMat.uniforms.uAspect.value = w / h;
     this.width = w;
     this.height = h;
   }
 
   render(dt, time) {
     if (!this.scene || !this.camera) return;
-    this._adapt(dt);
-    if (this.composer) {
-      const u = this.animePass.uniforms;
-      u.uTime.value = time;
-      u.uSpeed.value = this.fx.speed;
-      u.uFlash.value = this.fx.flash;
-      u.uAberration.value = this.fx.aberration;
-      u.uVignette.value = this.fx.vignette;
-      u.uSaturation.value = this.fx.saturation;
-      u.uContrast.value = this.fx.contrast;
-      this.composer.render(dt);
-    } else {
-      this.renderer.render(this.scene, this.camera);
+    const R = this.renderer;
+    const L = this.level;
+    this.frameNo++;
+    if (R.shadowMap.enabled) {
+      // карта только что пересоздана (смена размера) — отрисовать обязательно, иначе сцена сэмплит пустую карту
+      const fresh = this.sun && this.sun.castShadow && !this.sun.shadow.map;
+      R.shadowMap.needsUpdate = fresh || (L.shadows && this.frameNo % L.shadowEvery === 0);
     }
-  }
 
-  // Адаптивное разрешение: если кадры долгие — снижаем плотность пикселей, и наоборот.
-  _adapt(dt) {
-    if (!this.adaptive || !(dt > 0)) return;
-    this._frameTimes.push(dt);
-    this._adaptTimer += dt;
-    if (this._adaptTimer < 2.5) return;
-    const arr = this._frameTimes.slice().sort((a, b) => a - b);
-    const median = arr[Math.floor(arr.length / 2)];
-    this._frameTimes.length = 0;
-    this._adaptTimer = 0;
-    let changed = false;
-    if (median > 1 / 42 && this.dynamicScale > 0.6) {
-      this.dynamicScale = Math.max(0.6, this.dynamicScale - 0.15);
-      changed = true;
-    } else if (median < 1 / 58 && this.dynamicScale < 1) {
-      this.dynamicScale = Math.min(1, this.dynamicScale + 0.1);
-      changed = true;
-    }
-    if (changed) this.resize();
+    R.setRenderTarget(this.sceneRT);
+    R.render(this.scene, this.camera);
+    const bloomOn = !!this.bloomPass && L.bloomScale > 0;
+    if (bloomOn) this.bloomPass.render(R, null, this.sceneRT);
+
+    const u = this.finalMat.uniforms;
+    u.tDiffuse.value = this.sceneRT.texture;
+    u.tBloom.value = bloomOn ? this.bloomPass.texture : null;
+    u.uBloom.value = bloomOn ? 1 : 0;
+    u.uTime.value = time;
+    u.uSpeed.value = this.fx.speed;
+    u.uFlash.value = this.fx.flash;
+    u.uAberration.value = this.fx.aberration;
+    u.uVignette.value = this.fx.vignette;
+    u.uSaturation.value = this.fx.saturation;
+    u.uContrast.value = this.fx.contrast;
+    R.setRenderTarget(null);
+    this.finalQuad.render(R);
   }
 
   get info() {

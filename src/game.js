@@ -2,6 +2,7 @@
 // демо-гонка на фоне меню, камера, звук, эффекты, связь с интерфейсом.
 import * as THREE from 'three';
 import { Renderer, QUALITY_PRESETS } from './core/renderer.js';
+import { PerfGovernor, PERF_LEVELS, detectGpuTier, startLevelForTier } from './core/perf.js';
 import { Input } from './core/input.js';
 import { AudioManager } from './core/audio.js';
 import { CameraRig } from './race/camera.js';
@@ -16,7 +17,8 @@ const SETTINGS_KEY = 'sakura-drift-settings-v1';
 
 function loadSettings() {
   const def = {
-    quality: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'medium' : 'high',
+    quality: 'auto',
+    gfxV: 2,
     music: 0.55,
     sfx: 0.8,
     muted: false,
@@ -28,7 +30,8 @@ function loadSettings() {
   };
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-    return { ...def, ...s };
+    if (!s.gfxV) delete s.quality; // старые версии сохраняли 'high' всем — переводим на "Авто"
+    return { ...def, ...s, gfxV: 2 };
   } catch {
     return def;
   }
@@ -54,7 +57,10 @@ export class Game {
     if (params.get('quality')) this.settings.quality = params.get('quality');
 
     this.renderer = new Renderer(this.canvas);
-    this.renderer.setQuality(this.settings.quality);
+    const gpu = detectGpuTier(this.renderer.renderer.getContext());
+    this.perf = new PerfGovernor({ level: startLevelForTier(gpu.tier), onChange: () => this.applyQuality() });
+    this.applyQualitySetting(this.settings.quality);
+    window.addEventListener('resize', () => this.perf.settle(1));
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 5000);
     this.rig = new CameraRig(this.camera);
     this.input = new Input();
@@ -133,6 +139,7 @@ export class Game {
     await this.nextFrame();
     await this.loadWorld(this.settings.track);
     this.startDemo();
+    await this.prewarm();
     this.ui.setLoading(false);
     this.state = 'menu';
     this.ui.showScreen('title');
@@ -156,7 +163,7 @@ export class Game {
       this.world.dispose();
       this.world = null;
     }
-    const q = QUALITY_PRESETS[this.renderer.qualityName];
+    const q = this.worldPreset();
     let def;
     try {
       def = await loadTrack(trackId);
@@ -170,21 +177,20 @@ export class Game {
       this.world = buildWorld(def, { renderer: this.renderer.renderer, quality: q });
     }
     this.worldId = def.id;
-    this.world.setQuality(q);
     this.fx = new Effects(this.world.scene);
-    this.fx.setBudget(q.particles);
-    this.renderer.setView(this.world.scene, this.camera);
+    this.renderer.setView(this.world.scene, this.camera, this.world.lights && this.world.lights.sun);
+    this.applyQuality();
     this.renderer.setBloom(this.world.bloom);
     this.renderer.renderer.toneMappingExposure = this.world.exposure;
     this.renderer.fx.saturation = this.world.post.saturation ?? 1.06;
     this.renderer.fx.vignette = this.world.post.vignette ?? 0.28;
     this.renderer.fx.baseVignette = this.renderer.fx.vignette;
-    // прогреть шейдеры, чтобы не было рывка на первом кадре
-    try {
-      this.renderer.renderer.compile(this.world.scene, this.camera);
-    } catch {
-      /* не критично */
-    }
+  }
+
+  /** Прогреть шейдеры мира и машинок (иначе первый кадр на новой трассе замирает на компиляции). */
+  async prewarm() {
+    await this.renderer.prewarm(this.world.scene, this.camera);
+    this.perf.settle(2.5);
   }
 
   disposeRace() {
@@ -204,7 +210,7 @@ export class Game {
       laps: 99,
       fx: this.fx,
       demo: true,
-      shadows: this.renderer.quality.shadows,
+      shadows: this.realShadows(),
     });
     // разбросать карты по трассе, чтобы сразу было интересно
     const L = this.world.track.length;
@@ -224,15 +230,18 @@ export class Game {
     await this.loadWorld(this.settings.track);
     this.disposeRace();
     const def = await loadTrack(this.settings.track);
-    this.race = new Race({
+    const race = new Race({
       world: this.world,
       playerChar: getCharacter(this.settings.character),
       difficulty: this.settings.difficulty,
       laps: this.settings.laps,
       fx: this.fx,
-      shadows: this.renderer.quality.shadows,
+      shadows: this.realShadows(),
       skipIntro: !!opts.skipIntro,
     });
+    // гонка "оживает" только после прогрева шейдеров — иначе кадры во время компиляции крутили бы её как демо
+    await this.prewarm();
+    this.race = race;
     this.autopilot = !!opts.autopilot;
     this.audio.duck(0, 0.05);
     this.state = 'race';
@@ -273,19 +282,52 @@ export class Game {
     await this.nextFrame();
     await this.loadWorld(trackId);
     this.startDemo();
+    await this.prewarm();
     this.ui.setLoading(false);
   }
 
   setQuality(name) {
     this.settings.quality = name;
     this.saveSettings();
-    this.renderer.setQuality(name);
-    const q = QUALITY_PRESETS[name];
+    this.applyQualitySetting(name);
+    this.renderer.setView(this.world.scene, this.camera, this.world.lights && this.world.lights.sun);
+    this.renderer.setBloom(this.world.bloom);
+  }
+
+  /** 'auto' — база "Высокое" + автонастройка по FPS; иначе фиксированный пресет. */
+  applyQualitySetting(name) {
+    const auto = !QUALITY_PRESETS[name];
+    this.renderer.setQuality(auto ? 'high' : name);
+    this.perf.enabled = auto;
+    if (auto) this.perf.settle(1);
+    this.applyQuality();
+  }
+
+  /** Применить текущую ступень/пресет к рендеру, миру, частицам и теням машинок (без перекомпиляции). */
+  applyQuality() {
+    let q = this.renderer.quality;
+    if (this.perf.enabled) {
+      const L = PERF_LEVELS[this.perf.level];
+      const glow = this.world && this.world.bloom.threshold < 1.15; // неон: свечение — основа картинки
+      this.renderer.applyLevel({ ...L, bloomScale: L.bloomScale || (glow && L.glowBloom) || 0 });
+      q = { ...q, shadowSize: L.shadowSize, particles: L.particles };
+    }
     if (this.world) this.world.setQuality(q);
     if (this.fx) this.fx.setBudget(q.particles);
-    if (this.race) this.race.views.forEach((v) => v.setShadowMode(q.shadows));
-    this.renderer.setView(this.world.scene, this.camera);
-    this.renderer.setBloom(this.world.bloom);
+    if (this.race) this.race.views.forEach((v) => v.setShadowMode(this.realShadows()));
+  }
+
+  /** Настоящие тени у машинок — только если карта теней обновляется каждый кадр. */
+  realShadows() {
+    const R = this.renderer;
+    return R.renderer.shadowMap.enabled && R.level.shadows && R.level.shadowEvery === 1;
+  }
+
+  /** Пресет для сборки мира: в "Авто" детализация декораций зависит от текущей ступени. */
+  worldPreset() {
+    if (!this.perf.enabled) return this.renderer.quality;
+    const l = this.perf.level;
+    return QUALITY_PRESETS[l >= 5 ? 'low' : l >= 3 ? 'medium' : 'high'];
   }
 
   setPaused(p) {
@@ -305,6 +347,7 @@ export class Game {
     let dt = (t - this.last) / 1000;
     this.last = t;
     if (!(dt > 0)) dt = 1 / 60;
+    if (!this.paused && !document.hidden) this.perf.sample(dt);
     dt = Math.min(dt, 1 / 20);
     this.step(dt);
   }
@@ -605,6 +648,9 @@ export class Game {
         aberr = 0.012;
       } else if (s01 > 0.93) speed = (s01 - 0.93) * 3;
     }
+    // сглаженное значение "залипло" бы на NaN навсегда (и залило экран чёрным), а отрицательное гасит виньетку
+    speed = Number.isFinite(speed) ? Math.min(1, Math.max(0, speed)) : 0;
+    if (!Number.isFinite(this.flash)) this.flash = 0;
     fxr.speed += (speed - fxr.speed) * (1 - Math.exp(-dt * 8));
     fxr.aberration += (aberr - fxr.aberration) * (1 - Math.exp(-dt * 6));
     this.flash *= Math.exp(-dt * 5);

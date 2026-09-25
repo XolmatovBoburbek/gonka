@@ -290,7 +290,7 @@ export function makeLighthouse(opts = {}) {
       varying vec3 vV;
       void main() {
         float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.5);
-        float a = pow(vT, 2.2) * (0.25 + 0.75 * edge);
+        float a = pow(clamp(vT, 0.0, 1.0), 2.2) * (0.25 + 0.75 * edge);
         gl_FragColor = vec4(uColor * a, 1.0);
       }`,
     transparent: true,

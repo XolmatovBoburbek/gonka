@@ -395,7 +395,7 @@ export class UI {
   buildSettings() {
     const g = this.game;
     const q = this.$('.seg.quality');
-    q.innerHTML = Object.entries(QUALITY_PRESETS)
+    q.innerHTML = [['auto', { label: 'Авто' }], ...Object.entries(QUALITY_PRESETS)]
       .map(([k, v]) => `<button class="focusable" data-v="${k}">${v.label}</button>`)
       .join('');
     q.addEventListener('click', (e) => {
@@ -443,7 +443,7 @@ export class UI {
 
   syncSettings() {
     const s = this.game.settings;
-    this.root.querySelectorAll('.seg.quality button').forEach((b) => b.classList.toggle('sel', b.dataset.v === this.game.renderer.qualityName));
+    this.root.querySelectorAll('.seg.quality button').forEach((b) => b.classList.toggle('sel', b.dataset.v === (QUALITY_PRESETS[s.quality] ? s.quality : 'auto')));
     this.root.querySelectorAll('.seg.mute button').forEach((b) => b.classList.toggle('sel', (b.dataset.v === 'off') === !!s.muted));
     this.root.querySelectorAll('.seg.autogas button').forEach((b) => b.classList.toggle('sel', (b.dataset.v === 'on') === !!s.autoGas));
     this.$('.vol-music').value = s.music;

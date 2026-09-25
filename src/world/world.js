@@ -21,9 +21,10 @@ export function buildWorld(def, ctx) {
   const env = def.build({ scene, track, quality: ctx.quality, renderer: ctx.renderer });
   const updaters = [...meshes.updaters, pads.update, ...(env.updaters || [])];
 
-  // все меши принимают тени, кроме помеченных
+  // все меши принимают тени, кроме помеченных; контуры рисуются после непрозрачных (early-z отбрасывает закрытое)
   scene.traverse((o) => {
     if (o.isMesh && o.receiveShadow === false && !o.userData.noShadow && o.material && o.material.isMeshToonMaterial) o.receiveShadow = true;
+    if (o.material && o.material.userData && o.material.userData.outline) o.renderOrder = Math.max(o.renderOrder, 1);
   });
 
   return {
