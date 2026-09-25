@@ -600,6 +600,28 @@ kbd {
   font-weight: 800;
   opacity: 0.9;
 }
+.res-record {
+  margin-top: 4px;
+  font-weight: 800;
+  font-size: 14px;
+  min-height: 1em;
+}
+.res-record .new {
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #ffd84a, #ff9a1f);
+  color: var(--ink);
+  animation: blink 0.5s steps(2) 6;
+}
+.track .trec {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  font-family: var(--font);
+  font-weight: 900;
+  font-size: 12px;
+  text-shadow: 1px 1px 0 var(--ink);
+}
 .res-table {
   width: 100%;
   border-collapse: separate;

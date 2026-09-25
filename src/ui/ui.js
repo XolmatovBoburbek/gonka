@@ -78,7 +78,7 @@ export class UI {
 
       <div class="screen results-screen" data-screen="results">
         <div class="panel wide">
-          <div class="res-head"><div class="res-place"></div><div class="res-sub"></div></div>
+          <div class="res-head"><div class="res-place"></div><div class="res-sub"></div><div class="res-record"></div></div>
           <table class="res-table"><tbody></tbody></table>
           <div class="res-btns">
             <button class="btn primary focusable" data-act="restart">ЕЩЁ РАЗ</button>
@@ -148,6 +148,8 @@ export class UI {
   }
 
   hideScreens() {
+    // снять фокус с кнопок меню, иначе Пробел/Enter в гонке "нажмут" их снова
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     this.currentScreen = null;
     this.root.querySelectorAll('.screen').forEach((s) => s.classList.remove('on'));
   }
@@ -305,7 +307,7 @@ export class UI {
     const tracks = this.$('.tracks');
     tracks.innerHTML = TRACKS.map(
       (t) => `<button class="track focusable" data-id="${t.id}" style="--t1:${t.card[0]};--t2:${t.card[1]}">
-        <div class="tjp">${t.jp}</div><div class="tname">${t.name}</div><div class="ttime">${t.time}</div></button>`
+        <div class="tjp">${t.jp}</div><div class="tname">${t.name}</div><div class="ttime">${t.time}</div><div class="trec"></div></button>`
     ).join('');
     tracks.addEventListener('click', (e) => {
       const b = e.target.closest('.track');
@@ -369,7 +371,11 @@ export class UI {
     this.ensurePortraits();
     const s = g.settings;
     this.root.querySelectorAll('.char').forEach((b) => b.classList.toggle('sel', b.dataset.id === s.character));
-    this.root.querySelectorAll('.track').forEach((b) => b.classList.toggle('sel', b.dataset.id === s.track));
+    this.root.querySelectorAll('.track').forEach((b) => {
+      b.classList.toggle('sel', b.dataset.id === s.track);
+      const rec = g.records[g.recordKey(b.dataset.id, s.laps)];
+      b.querySelector('.trec').textContent = rec?.race ? '🏆 ' + fmtTime(rec.race) : '';
+    });
     this.root.querySelectorAll('.seg.diff button').forEach((b) => b.classList.toggle('sel', b.dataset.v === s.difficulty));
     this.root.querySelectorAll('.seg.laps button').forEach((b) => b.classList.toggle('sel', +b.dataset.v === s.laps));
     const c = CHARACTERS.find((x) => x.id === s.character);
@@ -453,7 +459,7 @@ export class UI {
     }
   }
 
-  showResults(results, player) {
+  showResults(results, player, record = null) {
     this.ensurePortraits();
     const idx = results.findIndex((r) => r.kart === player);
     const place = idx + 1;
@@ -463,6 +469,15 @@ export class UI {
     const sub = this.$('.res-sub');
     const msgs = ['', 'Великолепно! Настоящий чемпион!', 'Почти! Ещё чуть-чуть до победы.', 'Пьедестал твой!', 'Неплохо! Попробуй дрифтовать больше.', 'Используй мини-турбо в поворотах!', 'Собирай кристаллы с предметами!', 'Отстающим выпадают сильные предметы — не сдавайся!', 'Каждый чемпион с чего-то начинал!'];
     sub.textContent = msgs[place] || '';
+    const recEl = this.$('.res-record');
+    recEl.innerHTML = '';
+    if (record && player.finished) {
+      const parts = [];
+      if (record.race) parts.push(`<span class="new">НОВЫЙ РЕКОРД!</span> ${fmtTime(record.current.race)}`);
+      else if (record.current?.race) parts.push(`Рекорд трассы: ${fmtTime(record.current.race)}`);
+      if (record.lap) parts.push(`<span class="new">Лучший круг!</span> ${fmtTime(record.current.lap)}`);
+      recEl.innerHTML = parts.join(' · ');
+    }
     const rows = results
       .map((r, i) => {
         const me = r.kart === player;

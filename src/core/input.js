@@ -28,7 +28,11 @@ export class Input {
       this.down.add(e.code);
       this.edges.add(e.code);
       this.lastDevice = 'keyboard';
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        // в гонке клавиши управления не должны активировать кнопки/прокрутку
+        const t = e.target;
+        if (!(t && t.tagName === 'BUTTON')) e.preventDefault();
+      }
     };
     this._onKeyUp = (e) => this.down.delete(e.code);
     this._onBlur = () => this.down.clear();

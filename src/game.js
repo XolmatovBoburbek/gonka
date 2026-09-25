@@ -34,6 +34,16 @@ function loadSettings() {
   }
 }
 
+const RECORDS_KEY = 'sakura-drift-records-v1';
+
+function loadRecords() {
+  try {
+    return JSON.parse(localStorage.getItem(RECORDS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
 export class Game {
   constructor(root) {
     this.root = root;
@@ -67,6 +77,7 @@ export class Game {
     this.demoCamTimer = 0;
     this.demoTarget = 0;
 
+    this.records = loadRecords();
     this.ui = new UI(this, root.querySelector('#ui'));
 
     const unlock = () => this.audio.unlock();
@@ -86,6 +97,35 @@ export class Game {
     } catch {
       /* приватный режим — ничего страшного */
     }
+  }
+
+  recordKey(track = this.settings.track, laps = this.settings.laps) {
+    return `${track}:${laps}`;
+  }
+
+  /** Сохранить результат игрока; вернуть, что побито. */
+  saveRecord(kart) {
+    const key = this.recordKey();
+    const rec = this.records[key] || {};
+    const best = kart.lapTimes.length ? Math.min(...kart.lapTimes) : null;
+    const out = { race: false, lap: false, prev: { ...rec } };
+    if (!rec.race || kart.finishTime < rec.race) {
+      rec.race = kart.finishTime;
+      rec.char = kart.char.id;
+      out.race = true;
+    }
+    if (best && (!rec.lap || best < rec.lap)) {
+      rec.lap = best;
+      out.lap = true;
+    }
+    this.records[key] = rec;
+    try {
+      localStorage.setItem(RECORDS_KEY, JSON.stringify(this.records));
+    } catch {
+      /* без сохранения */
+    }
+    out.current = rec;
+    return out;
   }
 
   async start() {
@@ -280,7 +320,7 @@ export class Game {
     }
 
     if (this.state === 'race' && this.race) {
-      if (inp.pause) this.setPaused(!this.paused);
+      if (inp.pause && !this.ui.modal) this.setPaused(!this.paused);
       if (!this.paused) this.updateRace(dt, inp);
     } else if (this.race) {
       // демо на фоне меню
@@ -352,7 +392,7 @@ export class Game {
       else this.rig.updateFinish(dt, player);
       if (this.finishTimer > 3.2 && !this.resultsShown) {
         this.resultsShown = true;
-        this.ui.showResults(race.results(), race.player);
+        this.ui.showResults(race.results(), race.player, this.lastRecord);
         this.audio.playMusic('results');
       }
     } else {
@@ -521,6 +561,7 @@ export class Game {
           break;
         case 'finish':
           if (k === player && !demo) {
+            this.lastRecord = this.saveRecord(k);
             const good = e.place <= 3;
             a.sfx(good ? 'finishWin' : 'finishLose');
             a.duck(0.4, 3);

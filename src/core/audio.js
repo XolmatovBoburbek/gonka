@@ -15,6 +15,11 @@
  *
  * Music is a lookahead step sequencer (25 ms timer, 0.12 s schedule-ahead) that
  * plays data-described themes (bpm, chords, drum/bass patterns, melody).
+ * Drum hits are synthesized once into AudioBuffers at unlock (OfflineAudioContext)
+ * so each hit costs 1-2 nodes; until that finishes they are synthesized live.
+ * Every voice stops itself and disconnects its nodes when it ends.
+ *
+ * Usage: const audio = new AudioManager(); window.addEventListener('pointerdown', () => audio.unlock());
  */
 
 const MASTER_LEVEL = 0.9;
@@ -489,8 +494,8 @@ function synthChordSaw(S, out, t, dur, notes, vel, o) {
 /** FM electric piano (DX-style "city pop" EP). */
 function synthEP(S, out, t, dur, notes, vel) {
   const ctx = S.ctx;
-  const stopAt = t + dur + 0.6;
-  notes.forEach((m, i) => {
+  const stopAt = t + dur + 0.4;
+  notes.forEach((m) => {
     const f = mtof(m);
     const car = osc(ctx, 'sine', f, t);
     const mod = osc(ctx, 'sine', f, t);
@@ -507,13 +512,9 @@ function synthEP(S, out, t, dur, notes, vel) {
     amp.gain.setValueAtTime(0, t);
     amp.gain.linearRampToValueAtTime(vel, t + 0.004);
     amp.gain.setTargetAtTime(vel * 0.25, t + 0.004, 0.7);
-    amp.gain.setTargetAtTime(0, t + dur, 0.09);
-    const pan = stereo(ctx, (i % 2 ? 0.25 : -0.25));
+    amp.gain.setTargetAtTime(0, t + dur, 0.07);
+    car.connect(amp).connect(out);
     const nodes = [car, mod, mg, tine, tg, amp];
-    if (pan) {
-      car.connect(amp).connect(pan).connect(out);
-      nodes.push(pan);
-    } else car.connect(amp).connect(out);
     for (const o of [car, mod, tine]) {
       o.start(t);
       o.stop(stopAt);
@@ -1100,7 +1101,7 @@ function compileTheme(name) {
   return out;
 }
 
-// Mixer channels of a theme player: g = level, d = delay send, r = reverb send, hp = high-pass
+// Mixer channels of a theme player: g = level, d = delay send, r = reverb send, hp = optional high-pass
 const CHANNELS = {
   kick: { g: 0.5, d: 0, r: 0 },
   snare: { g: 0.85, d: 0, r: 0.12 },
@@ -1108,11 +1109,11 @@ const CHANNELS = {
   hat: { g: 0.3, d: 0, r: 0.04 },
   perc: { g: 0.35, d: 0, r: 0.2 },
   bass: { g: 0.7, d: 0, r: 0 },
-  pad: { g: 1, d: 0, r: 0.35, hp: 140 },
-  chord: { g: 1, d: 0.08, r: 0.18, hp: 160 },
-  arp: { g: 1.2, d: 0.28, r: 0.18, hp: 220 },
+  pad: { g: 1, d: 0, r: 0.35 },
+  chord: { g: 1, d: 0.08, r: 0.18 },
+  arp: { g: 1.2, d: 0.28, r: 0.18 },
   lead: { g: 1.25, d: 0.24, r: 0.2 },
-  lead2: { g: 1.25, d: 0.18, r: 0.2, hp: 300 },
+  lead2: { g: 1.25, d: 0.18, r: 0.2 },
 };
 const PUMPED = ['pad', 'chord', 'arp'];
 const HAT_VEL = { x: 1, h: 0.55, o: 0.75 };
@@ -1466,6 +1467,7 @@ function sNoise(S, out, t, o) {
 }
 
 const semi = (f, st) => f * Math.pow(2, st / 12);
+const own = (obj, key) => typeof key === 'string' && Object.prototype.hasOwnProperty.call(obj, key);
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 const BRASS = { wave: 'sawtooth', wave2: 'sawtooth', detune: 12, mix2: 0.9, cutoff: 2300, q: 1, attack: 0.02, sustain: 0.85, release: 0.14, vibrato: 0.012, vibRate: 5.5 };
@@ -1962,7 +1964,7 @@ export class AudioManager {
 
   playMusic(theme) {
     if (!this._AC) return;
-    if (!THEMES[theme]) {
+    if (!own(THEMES, theme)) {
       this._warnOnce('theme:' + theme, 'AudioManager: unknown music theme "' + theme + '"');
       return;
     }
@@ -2048,12 +2050,12 @@ export class AudioManager {
   // ----- one-shot sfx -----------------------------------------------------
 
   sfx(name, opts = {}) {
-    const def = SFX[name];
+    const def = own(SFX, name) ? SFX[name] : null;
     if (!def) {
       this._warnOnce('sfx:' + name, 'AudioManager: unknown sfx "' + name + '"');
       return;
     }
-    if (!this._ready() || this._muted) return;
+    if (!this._ready() || this._muted || this._sfxVolume <= 0) return;
     if (this._activeSfx >= MAX_ACTIVE_SFX) return;
     opts = opts || {};
     const volume = clamp(num(opts.volume, 1), 0, 2);

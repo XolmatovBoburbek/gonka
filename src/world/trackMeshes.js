@@ -171,7 +171,6 @@ export function buildTrackMeshes(track, theme = {}) {
   const group = new THREE.Group();
   group.name = 'track';
   const updaters = [];
-  const N = track.count;
   const L = track.length;
   // vScale так, чтобы текстура дороги замыкалась без шва
   const roadRepeat = Math.max(1, Math.round(L / 18));
