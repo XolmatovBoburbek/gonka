@@ -8,9 +8,9 @@ import { AnimeShader } from './animeShader.js';
 
 // pixelBudget — максимум пикселей буфера (на HiDPI-экранах не рисуем 4–8 млн пикселей).
 export const QUALITY_PRESETS = {
-  low: { label: 'Низкое', pixelBudget: 1.0e6, maxPixelRatio: 1, shadows: false, shadowSize: 512, post: true, bloom: false, bloomScale: 0, msaa: 0, particles: 0.45, detail: 0.55 },
-  medium: { label: 'Среднее', pixelBudget: 2.1e6, maxPixelRatio: 1.35, shadows: true, shadowSize: 1024, post: true, bloom: true, bloomScale: 0.5, msaa: 2, particles: 0.75, detail: 0.8 },
-  high: { label: 'Высокое', pixelBudget: 3.7e6, maxPixelRatio: 2, shadows: true, shadowSize: 2048, post: true, bloom: true, bloomScale: 1, msaa: 4, particles: 1, detail: 1 },
+  low: { label: 'Низкое', pixelBudget: 1.0e6, maxPixelRatio: 1, shadows: false, shadowSize: 512, post: true, bloom: false, bloomScale: 0, msaa: 0, particles: 0.45, detail: 0.55, kartLod: 20, outlineLod: 60 },
+  medium: { label: 'Среднее', pixelBudget: 2.1e6, maxPixelRatio: 1.35, shadows: true, shadowSize: 1024, post: true, bloom: true, bloomScale: 0.5, msaa: 2, particles: 0.75, detail: 0.8, kartLod: 28, outlineLod: 90 },
+  high: { label: 'Высокое', pixelBudget: 3.7e6, maxPixelRatio: 2, shadows: true, shadowSize: 2048, post: true, bloom: true, bloomScale: 1, msaa: 4, particles: 1, detail: 1, kartLod: 40, outlineLod: 140 },
 };
 
 // Выделение ярких мест для bloom: 4 отсчёта (при уменьшенном bloom иначе тонкие неоновые линии мерцали бы —
@@ -237,6 +237,30 @@ export class Renderer {
       await done;
     } catch {
       /* не критично */
+    }
+    // программы теней собираются, когда объект впервые попадает в коробку теней (compile() их не видит) —
+    // один раз рисуем карту теней с коробкой на весь мир, пока открыт экран загрузки
+    const sun = this.sun;
+    if (sun && sun.castShadow && R.shadowMap.enabled) {
+      const c = sun.shadow.camera;
+      const saved = [c.left, c.right, c.top, c.bottom, c.near, c.far];
+      c.left = c.bottom = -3000;
+      c.right = c.top = 3000;
+      c.near = 0.5;
+      c.far = 6000;
+      c.updateProjectionMatrix();
+      try {
+        R.shadowMap.needsUpdate = true;
+        R.setRenderTarget(this.sceneRT);
+        R.render(scene, camera);
+      } catch {
+        /* не критично */
+      } finally {
+        R.setRenderTarget(prev);
+        [c.left, c.right, c.top, c.bottom, c.near, c.far] = saved;
+        c.updateProjectionMatrix();
+        R.shadowMap.needsUpdate = true;
+      }
     }
   }
 

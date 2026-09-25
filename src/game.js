@@ -191,8 +191,10 @@ export class Game {
   }
 
   /** Прогреть шейдеры мира и машинок (иначе первый кадр на новой трассе замирает на компиляции). */
-  async prewarm() {
+  async prewarm(race = this.race) {
+    const restore = race && race.items ? race.items.addPrewarmProtos() : null; // сфера и ловушка — тоже сейчас
     await this.renderer.prewarm(this.world.scene, this.camera);
+    if (restore) restore();
     this.perf.settle(2.5);
   }
 
@@ -243,7 +245,7 @@ export class Game {
       skipIntro: !!opts.skipIntro,
     });
     // гонка "оживает" только после прогрева шейдеров — иначе кадры во время компиляции крутили бы её как демо
-    await this.prewarm();
+    await this.prewarm(race);
     this.race = race;
     race.views.forEach((v) => v.setShadowMode(this.realShadows())); // ступень качества могла смениться за время прогрева
     this.autopilot = !!opts.autopilot;
@@ -314,9 +316,13 @@ export class Game {
       const L = PERF_LEVELS[this.perf.level];
       const glow = this.world && this.world.bloom.threshold < 1.15; // неон: свечение — основа картинки
       this.renderer.applyLevel({ ...L, bloomScale: L.bloomScale || (glow && L.glowBloom) || 0 });
-      q = { ...q, shadowSize: L.shadowSize, particles: L.particles };
+      q = { ...q, shadowSize: L.shadowSize, particles: L.particles, kartLod: L.kartLod, outlineLod: L.outlineLod };
     }
-    if (this.world) this.world.setQuality(q);
+    this.lod = { kart: q.kartLod, outline: q.outlineLod };
+    if (this.world) {
+      this.world.setQuality(q);
+      if (this.world.setLod) this.world.setLod({ outline: q.outlineLod });
+    }
     if (this.fx) this.fx.setBudget(q.particles);
     if (this.race) this.race.views.forEach((v) => v.setShadowMode(this.realShadows()));
   }
@@ -382,6 +388,7 @@ export class Game {
       this.world.update(dt, this.camera, focus);
       this.fx.update(dt, this.camera, this.renderer.height * this.renderer.pixelRatio);
     }
+    if (this.race && this.lod) this.race.updateLod(this.camera.position, this.lod.kart);
     this.updateScreenFx(dt);
     this.input.endFrame();
     if (render) this.renderer.render(dt, this.time);

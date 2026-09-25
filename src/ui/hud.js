@@ -88,13 +88,21 @@ export class Hud {
     this._setupTouch();
   }
 
+  /** Экранные кнопки и автогаз — только когда играют пальцами (ноутбук с сенсорным экраном играет с клавиатуры). */
+  setTouch(on) {
+    if (this.touchEnabled === on) return;
+    this.touchEnabled = on;
+    this.el.classList.toggle('touch-on', on);
+    const input = this.ui.game.input;
+    input.touchMode = on;
+    input.autoGas = this.ui.game.settings.autoGas;
+  }
+
   _setupTouch() {
     const input = this.ui.game.input;
-    const touch = window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window;
-    this.touchEnabled = touch;
-    this.el.classList.toggle('touch-on', touch);
-    input.touchMode = touch;
-    input.autoGas = this.ui.game.settings.autoGas;
+    this.setTouch(!!window.matchMedia?.('(pointer: coarse)').matches);
+    window.addEventListener('pointerdown', (e) => e.pointerType === 'touch' && this.setTouch(true), { passive: true });
+    window.addEventListener('keydown', () => this.setTouch(false));
     const t = input.touch;
     const state = { left: false, right: false };
     const apply = () => (t.steer = (state.right ? 1 : 0) - (state.left ? 1 : 0));
@@ -252,14 +260,20 @@ export class Hud {
 
   update(race, dt) {
     const p = race.player;
+    if (this.touchEnabled && this.ui.game.input.lastDevice === 'gamepad') this.setTouch(false);
     // время и круг
     const lap = Math.max(1, Math.min(race.laps, p.lapsDone + 1));
     if (this._last.lap !== lap) {
       this.lapN.textContent = lap;
       this._last.lap = lap;
     }
+    // текст таймера — 20 раз в секунду: каждое изменение текста заставляет браузер пересчитать разметку
     const t = p.finished ? p.finishTime : race.raceTime;
-    this.timeEl.textContent = fmtTime(t);
+    const tKey = Math.floor(t * 20);
+    if (this._last.time !== tKey || p.finished) {
+      this.timeEl.textContent = fmtTime(t);
+      this._last.time = tKey;
+    }
     if (this._last.place !== p.place) {
       this.placeNum.textContent = p.place;
       this.placeBox.dataset.place = p.place <= 3 ? p.place : 'n';
@@ -306,7 +320,12 @@ export class Hud {
       this.hintTimer -= dt;
       if (this.hintTimer <= 0) this.hintEl.classList.remove('on');
     }
-    this.drawMap(race);
+    // миникарта — 30 раз в секунду (это перерисовка канваса и его загрузка в композитор)
+    this._mapT = (this._mapT || 0) + dt;
+    if (this._mapT >= 1 / 30) {
+      this._mapT = 0;
+      this.drawMap(race);
+    }
   }
 
   // ------------------------------------------------------------------ миникарта

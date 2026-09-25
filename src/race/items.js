@@ -336,6 +336,16 @@ export class ItemSystem {
     });
   }
 
+  /** Временные копии сферы и ловушки: их шейдеры компилируются при загрузке, а не при первом выстреле. */
+  addPrewarmProtos() {
+    const orb = new THREE.Group();
+    orb.add(new THREE.Mesh(this.orbGeo, this.orbCoreMat), new THREE.Sprite(this.orbHaloMat), new THREE.Mesh(this.starGeo, this.starMat));
+    const trap = new THREE.Mesh(this.iceGeo, this.iceMat);
+    trap.add(new THREE.Mesh(this.iceGeo, outlineMaterial(0x1c3a5a, 0.05)));
+    this.group.add(orb, trap);
+    return () => this.group.remove(orb, trap);
+  }
+
   _dropTrap(kart) {
     const s = kart.progress - 3.2;
     const fr = this.track.frameAtProgress(s, {});
@@ -343,8 +353,7 @@ export class ItemSystem {
     const pos = fr.pos.clone().addScaledVector(fr.right, lat);
     const mesh = new THREE.Mesh(this.iceGeo, this.iceMat);
     mesh.position.copy(pos);
-    mesh.scale.setScalar(0.2);
-    mesh.castShadow = true;
+    mesh.scale.setScalar(0.2); // полупрозрачный лёд без тени: и честнее, и без компиляции теневого шейдера посреди гонки
     const ol = new THREE.Mesh(this.iceGeo, outlineMaterial(0x1c3a5a, 0.05));
     mesh.add(ol);
     this.group.add(mesh);

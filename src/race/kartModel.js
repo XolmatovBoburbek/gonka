@@ -831,11 +831,24 @@ export class KartView {
     this.headYaw = 0;
     this.flicker = 0;
 
+    // детали, которые издалека меньше пикселя: контуры, эмблема, шарфы (см. setFar)
+    this.lodParts = [emblem, ...this.scarves.map((sc) => sc.mesh)];
+    this.far = false;
     this.root.traverse((o) => {
       if (o.isMesh && !o.userData.isOutline && o !== this.blob) o.castShadow = o.castShadow || false;
       // контуры — после непрозрачных: early-z отбрасывает закрытую часть оболочки
-      if (o.material && o.material.userData && o.material.userData.outline) o.renderOrder = Math.max(o.renderOrder, 1);
+      if (o.material && o.material.userData && o.material.userData.outline) {
+        o.renderOrder = Math.max(o.renderOrder, 1);
+        this.lodParts.push(o);
+      }
     });
+  }
+
+  /** Далеко от камеры: прячем мелкие детали и не считаем шарфы и хвостики. */
+  setFar(far) {
+    if (far === this.far) return;
+    this.far = far;
+    for (const m of this.lodParts) m.visible = !far;
   }
 
   setShadowMode(realShadows) {
@@ -890,8 +903,8 @@ export class KartView {
     this.head.rotation.z = this.latSm * 0.08 + Math.sin(this.time * 2.1) * 0.02;
     this.head.position.y = 1.56 + Math.sin(this.time * 3.3) * 0.008;
 
-    // хвосты: пружина от ускорения, поворотов и ветра
-    for (const sw of this.swing) {
+    // хвосты: пружина от ускорения, поворотов и ветра (издалека не видно — не считаем)
+    for (const sw of this.far ? [] : this.swing) {
       const wind = speed01 * 0.9;
       const tx = -wind * 0.75 * sw.amp + this.accelSm * 0.35 + Math.sin(this.time * 9 + sw.side) * 0.08 * wind;
       const tz = this.latSm * 0.45 * sw.amp + Math.sin(this.time * 7 + sw.side * 2) * 0.06 * wind;
@@ -904,7 +917,7 @@ export class KartView {
       sw.pivot.rotation.x = sw.rx;
       sw.pivot.rotation.z = sw.rz;
     }
-    for (const sc of this.scarves) sc.update(this.time, speed01, this.latSm);
+    if (!this.far) for (const sc of this.scarves) sc.update(this.time, speed01, this.latSm);
 
     // пламя
     const boosting = !!s.boosting;

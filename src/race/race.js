@@ -362,6 +362,14 @@ export class Race {
     }
   }
 
+  /** Упрощать машинки дальше D м от камеры (с запасом, чтобы детали не мигали на границе). */
+  updateLod(camPos, D) {
+    for (const v of this.views) {
+      const d2 = v.root.position.distanceToSquared(camPos);
+      v.setFar(v.far ? d2 > (0.9 * D) ** 2 : d2 > (1.1 * D) ** 2);
+    }
+  }
+
   /** Результаты: финишировавшие + оценка времени для остальных. */
   results() {
     const out = [];

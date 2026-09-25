@@ -3,15 +3,16 @@
 
 /** Лестница качества: 0 — лучшее; каждая следующая ступень заметно дешевле для GPU. */
 export const PERF_LEVELS = [
-  { name: 'Ультра', scale: 1, msaa: 4, bloomScale: 1, shadows: true, shadowSize: 2048, shadowEvery: 1, particles: 1 },
-  { name: 'Высокое', scale: 1, msaa: 2, bloomScale: 1, shadows: true, shadowSize: 2048, shadowEvery: 1, particles: 1 },
-  { name: 'Высокое−', scale: 1, msaa: 2, bloomScale: 0.5, shadows: true, shadowSize: 2048, shadowEvery: 1, particles: 1 },
+  // kartLod / outlineLod — дальше этих метров у машинок и декораций прячутся мелкие детали и контуры
+  { name: 'Ультра', scale: 1, msaa: 4, bloomScale: 1, shadows: true, shadowSize: 2048, shadowEvery: 1, particles: 1, kartLod: 40, outlineLod: 140 },
+  { name: 'Высокое', scale: 1, msaa: 2, bloomScale: 1, shadows: true, shadowSize: 2048, shadowEvery: 1, particles: 1, kartLod: 40, outlineLod: 140 },
+  { name: 'Высокое−', scale: 1, msaa: 2, bloomScale: 0.5, shadows: true, shadowSize: 2048, shadowEvery: 1, particles: 1, kartLod: 32, outlineLod: 110 },
   // тени раз в 2 кадра — у машинок круглые тени (иначе их тень дёргалась бы на скорости)
-  { name: 'Среднее', scale: 0.85, msaa: 2, bloomScale: 0.5, shadows: true, shadowSize: 1024, shadowEvery: 2, particles: 0.75 },
-  { name: 'Среднее−', scale: 0.75, msaa: 0, bloomScale: 0.5, shadows: true, shadowSize: 1024, shadowEvery: 2, particles: 0.75 },
+  { name: 'Среднее', scale: 0.85, msaa: 2, bloomScale: 0.5, shadows: true, shadowSize: 1024, shadowEvery: 2, particles: 0.75, kartLod: 28, outlineLod: 90 },
+  { name: 'Среднее−', scale: 0.75, msaa: 0, bloomScale: 0.5, shadows: true, shadowSize: 1024, shadowEvery: 2, particles: 0.75, kartLod: 28, outlineLod: 90 },
   // на неоне свечение и есть картинка — оставляем дешёвый bloom в четверть разрешения
-  { name: 'Низкое', scale: 0.7, msaa: 0, bloomScale: 0, glowBloom: 0.5, shadows: false, shadowSize: 1024, shadowEvery: 1, particles: 0.5 },
-  { name: 'Низкое−', scale: 0.55, msaa: 0, bloomScale: 0, shadows: false, shadowSize: 1024, shadowEvery: 1, particles: 0.35 },
+  { name: 'Низкое', scale: 0.7, msaa: 0, bloomScale: 0, glowBloom: 0.5, shadows: false, shadowSize: 1024, shadowEvery: 1, particles: 0.5, kartLod: 20, outlineLod: 60 },
+  { name: 'Низкое−', scale: 0.55, msaa: 0, bloomScale: 0, shadows: false, shadowSize: 1024, shadowEvery: 1, particles: 0.35, kartLod: 20, outlineLod: 40 },
 ];
 
 /** Грубый класс GPU до первого кадра: 0 — программный рендер, 1 — слабая встройка/телефон, 2 — средняя, 3 — дискретная. */

@@ -93,6 +93,7 @@ export class ParticleSystem {
     this.max = max;
     this.count = 0;
     this.cursor = 0;
+    this.firstFree = 0; // все слоты ниже — живые: частицы лежат плотно, в видеокарту уходит только начало буфера
     const geo = new THREE.BufferGeometry();
     this.positions = new Float32Array(max * 3);
     this.colors = new Float32Array(max * 4);
@@ -135,15 +136,17 @@ export class ParticleSystem {
   emit(o) {
     if (this.budget < 1 && Math.random() > this.budget) return;
     let i = -1;
-    for (let k = 0; k < this.max; k++) {
-      const j = (this.cursor + k) % this.max;
+    for (let j = this.firstFree; j < this.max; j++) {
       if (!this.alive[j]) {
         i = j;
         break;
       }
     }
-    if (i < 0) i = this.cursor;
-    this.cursor = (i + 1) % this.max;
+    if (i < 0) {
+      // пул полон — перезаписываем по кругу
+      i = this.cursor;
+      this.cursor = (this.cursor + 1) % this.max;
+    } else this.firstFree = i + 1;
     this.alive[i] = 1;
     const p = o.pos;
     this.positions[i * 3] = p.x;
@@ -184,6 +187,7 @@ export class ParticleSystem {
       const t = this.life[i] / this.maxLife[i];
       if (t >= 1) {
         this.alive[i] = 0;
+        if (i < this.firstFree) this.firstFree = i;
         this.colors[i * 4 + 3] = 0;
         this.sizes[i * 2] = 0;
         continue;
@@ -206,15 +210,19 @@ export class ParticleSystem {
     }
     this.count = last;
     this.geo.setDrawRange(0, this.count);
+    if (!this.count) return;
+    // загружаем только живую часть буфера, а не весь пул
     const g = this.geo.attributes;
-    g.position.needsUpdate = true;
-    g.aColor.needsUpdate = true;
-    g.aSizeShape.needsUpdate = true;
-    g.aRot.needsUpdate = true;
+    for (const a of [g.position, g.aColor, g.aSizeShape, g.aRot]) {
+      a.clearUpdateRanges();
+      a.addUpdateRange(0, this.count * a.itemSize);
+      a.needsUpdate = true;
+    }
   }
 
   clear() {
     this.alive.fill(0);
+    this.firstFree = 0;
     this.count = 0;
     this.geo.setDrawRange(0, 0);
   }
@@ -257,7 +265,8 @@ export class Popups {
   constructor(scene, n = 8) {
     this.items = [];
     for (let i = 0; i < n; i++) {
-      const mat = new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false, fog: false });
+      // карта-заглушка сразу: смена одной текстуры на другую не требует новой шейдерной программы посреди гонки
+      const mat = new THREE.SpriteMaterial({ map: sparkleTexture(), transparent: true, depthTest: false, depthWrite: false, fog: false });
       const s = new THREE.Sprite(mat);
       s.visible = false;
       s.renderOrder = 20;
@@ -270,7 +279,6 @@ export class Popups {
     const it = this.items[this.cursor];
     this.cursor = (this.cursor + 1) % this.items.length;
     it.sprite.material.map = popupTexture(text, color, stroke);
-    it.sprite.material.needsUpdate = true;
     it.sprite.visible = true;
     it.t = 0;
     it.life = life;
