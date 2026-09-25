@@ -60,7 +60,7 @@ export class CameraRig {
     const desired = new THREE.Vector3().copy(kart.pos).addScaledVector(fwd, -dist * dir);
     desired.y = kart.pos.y + height;
     // на высокой скорости (буст) камера держится плотнее — иначе машинка "улетает" вдаль
-    const kp = this.lookBack ? 1 : 1 - Math.exp(-dt * (11 + Math.max(0, s01 - 1) * 20));
+    const kp = this.lookBack ? 1 : 1 - Math.exp(-dt * (11 + Math.max(0, Math.min(2, sp / 40) - 1) * 20));
     this.pos.lerp(desired, kp);
     // не опускаться ниже карта
     if (this.pos.y < kart.pos.y + 1.1) this.pos.y = kart.pos.y + 1.1;
@@ -68,7 +68,8 @@ export class CameraRig {
     const lookT = new THREE.Vector3().copy(kart.pos).addScaledVector(fwd, 4.5 * dir);
     lookT.y = kart.pos.y + 1.25;
     this.look.lerp(lookT, this.lookBack ? 1 : 1 - Math.exp(-dt * 14));
-    const targetFov = 66 + s01 * 9 + (boosting ? (kart.boost.kind === 'boost3' ? 11 : 9) : 0);
+    const stackFov = boosting ? Math.min(2, kart.boost.stack - 1) * 2 : 0; // сложенные бусты — ещё шире
+    const targetFov = Math.min(92, 66 + s01 * 9 + (boosting ? (kart.boost.kind === 'boost3' ? 11 : 9) : 0) + stackFov);
     this.fov += (targetFov - this.fov) * (1 - Math.exp(-dt * 4));
     const targetRoll = kart.drift.active ? -kart.drift.dir * 0.035 : -kart.steer * 0.012 * s01;
     this.roll += (targetRoll - this.roll) * (1 - Math.exp(-dt * 5));

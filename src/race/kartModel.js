@@ -876,7 +876,7 @@ export class KartView {
     for (const w of this.wheels) {
       w.spin.rotation.x = this.wheelAngle * (0.33 / w.r);
       // в заносе передние колёса смотрят по ходу движения — контр-руль виден
-      if (w.front) w.steer.rotation.y = this.visSteer * (s.drifting ? 0.15 : 0.42) - THREE.MathUtils.clamp((s.driftDir || 0) * (s.driftAngle || 0) * 1.2, -0.6, 0.6);
+      if (w.front) w.steer.rotation.y = -this.visSteer * (s.drifting ? 0.15 : 0.42) + THREE.MathUtils.clamp((s.driftDir || 0) * (s.driftAngle || 0) * 1.2, -0.6, 0.6);
     }
     // ускорение для покачиваний
     const acc = (s.speed - this.prevSpeed) / Math.max(dt, 1e-4);
@@ -926,7 +926,8 @@ export class KartView {
       f.grp.visible = boosting;
       if (boosting) {
         const k = 0.85 + Math.sin(this.flicker + f.grp.position.x * 10) * 0.12 + Math.random() * 0.12;
-        const big = s.boostKind === 'item' || s.boostKind === 'pad' ? 1.35 : s.boostKind === 'boost3' ? 1.5 : s.boostKind === 'boost2' ? 1.2 : 1.0;
+        let big = s.boostKind === 'item' || s.boostKind === 'pad' ? 1.35 : s.boostKind === 'boost3' ? 1.5 : s.boostKind === 'boost2' ? 1.2 : 1.0;
+        big *= 1 + Math.min(2, (s.boostStack || 1) - 1) * 0.25; // бусты сложились — пламя длиннее
         f.grp.scale.set(k, k * big, k);
         const col = s.boostKind === 'boost1' ? 0x4aa8ff : s.boostKind === 'boost2' ? 0xff9a3c : s.boostKind === 'boost3' ? 0xff4fd8 : 0xff7a2a;
         f.outer.material.color.setHex(col).multiplyScalar(3);

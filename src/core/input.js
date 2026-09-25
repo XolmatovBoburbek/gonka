@@ -12,6 +12,7 @@ const KEYS = {
   respawn: ['KeyR'],
   mute: ['KeyM'],
 };
+const GAME_CODES = new Set(Object.values(KEYS).flat());
 
 export class Input {
   constructor() {
@@ -24,8 +25,11 @@ export class Input {
     this.lastDevice = 'keyboard';
     this.enabled = true;
     this._onKeyDown = (e) => {
-      if (e.repeat) return;
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+      // Ctrl — клавиша предмета: с ней F (буст), D, S, R… открывали бы поиск, закладки, перезагрузку браузера
+      // (и на автоповторе зажатой клавиши тоже)
+      if (e.ctrlKey && GAME_CODES.has(e.code) && !e.code.startsWith('Control')) e.preventDefault();
+      if (e.repeat) return;
       this.down.add(e.code);
       this.edges.add(e.code);
       this.lastDevice = 'keyboard';

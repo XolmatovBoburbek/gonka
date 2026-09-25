@@ -349,9 +349,10 @@ export class Race {
       // пламя буста
       if (k.boost.time > 0) {
         const col = k.boost.kind.startsWith('boost') ? DRIFT_COLORS[+k.boost.kind.slice(5)] : undefined;
+        const sc = 1 + Math.min(2, k.boost.stack - 1) * 0.3; // сложенные бусты — пламя длиннее
         for (const ep of v.exhaustPoints) {
           wp.copy(ep).applyMatrix4(v.root.matrixWorld);
-          this.fx.flame(wp, { x: -f.x, z: -f.z }, col);
+          this.fx.flame(wp, { x: -f.x, z: -f.z }, col, sc);
         }
       }
       // пыль на бездорожье

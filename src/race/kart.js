@@ -22,7 +22,9 @@ export const PHYS = {
   driftAngleRate: 5.5,
   driftRecover: 6.5, // как быстро после заноса возвращается сцепление
   driftScrub: 0.3, // потеря скорости боком скользящих шин
-  driftFlipHold: 0.3, // столько держать полный контр-руль на малом угле, чтобы переложить занос
+  // столько держать полный контр-руль на малом угле, чтобы переложить занос: с клавиатуры руль бывает только
+  // полным, и при 0.3 с обычная поправка траектории перекладывала занос случайно
+  driftFlipHold: 1.2,
   // буст-шкала из трёх делений: копится в заносе и на трюках, тратится вся сразу — уровень = число делений
   meterRate: 0.42,
   meterTrick: 0.25,
@@ -31,6 +33,8 @@ export const PHYS = {
     [2.0, 1.3],
     [3.2, 1.38],
   ],
+  // бусты из разных источников складываются (нитро + ускоритель на дороге + шкала), но не больше чем ×2
+  boostStackMax: 1.0,
 };
 
 const _tmp = new THREE.Vector3();
@@ -63,7 +67,9 @@ export class Kart {
 
     // level — какой уровень буста сейчас копится (цвет искр); angle — угол заноса, гаснет и после дрифта
     this.drift = { active: false, dir: 0, angle: 0, flipT: 0, level: 0, intent: false };
-    this.boost = { time: 0, power: 1, kind: '' };
+    // активные бусты — у каждого свой таймер, прибавки к скорости складываются; boost — их сводка
+    this.boosts = [];
+    this.boost = { time: 0, power: 1, kind: '', stack: 0 };
     this.boostMeter = 0; // 0..3 деления
     this.spinTimer = 0;
     this.spinAngle = 0;
@@ -135,13 +141,40 @@ export class Kart {
     this.surfaceUp.copy(fr.up);
   }
 
-  addBoost(time, power, kind) {
-    if (this.boost.time <= 0 || power >= this.boost.power) {
-      this.boost.power = power;
-      this.boost.kind = kind;
+  /**
+   * Буст: прибавка (power − 1) к максимальной скорости на time секунд. Бусты складываются — нитро на
+   * ускорителе даёт обе прибавки сразу. key — источник, который не складывается сам с собой (тот же
+   * ускоритель под колёсами продлевает свой буст, а не удваивает его).
+   */
+  addBoost(time, power, kind, key = null) {
+    const b = key && this.boosts.find((x) => x.key === key);
+    if (b) {
+      b.time = Math.max(b.time, time);
+      b.power = Math.max(b.power, power);
+    } else this.boosts.push({ key, kind, time, power });
+    this._sumBoosts();
+    this.emit('boost', { kind, stack: this.boost.stack, added: !b });
+  }
+
+  clearBoosts() {
+    this.boosts.length = 0;
+    this._sumBoosts();
+  }
+
+  /** Сводка активных бустов: общий множитель скорости, самый долгий таймер, самый сильный вид, число слоёв. */
+  _sumBoosts() {
+    const B = this.boost;
+    let bonus = 0;
+    let top = null;
+    B.time = 0;
+    for (const b of this.boosts) {
+      bonus += b.power - 1;
+      if (b.time > B.time) B.time = b.time;
+      if (!top || b.power > top.power) top = b;
     }
-    this.boost.time = Math.max(this.boost.time, time);
-    this.emit('boost', { kind });
+    B.power = 1 + Math.min(PHYS.boostStackMax, bonus);
+    B.kind = top ? top.kind : '';
+    B.stack = this.boosts.length;
   }
 
   /** Попадание: 'spin' (сфера) или 'freeze' (лёд). Возвращает true, если эффект применён. */
@@ -155,7 +188,7 @@ export class Kart {
     }
     this.lastHitBy = by;
     this.cancelDrift();
-    this.boost.time = 0;
+    this.clearBoosts();
     if (kind === 'freeze') {
       this.frozenTimer = 1.5;
       this.invuln = 2.6;
@@ -187,8 +220,9 @@ export class Kart {
 
   /** Потратить все полные деления: 1 — синий буст, 2 — оранжевый, 3 — фиолетовый (сильнее и дольше). */
   useBoost() {
+    if (!this.controllable) return false; // закрутило или заморозило — шкалу не трогаем
     const n = Math.min(3, Math.floor(this.boostMeter + 1e-6));
-    if (n < 1 || !this.controllable) {
+    if (n < 1) {
       this.emit('boostEmpty');
       return false;
     }
@@ -226,7 +260,12 @@ export class Kart {
     this.prevPos.copy(this.pos);
 
     // таймеры
-    if (this.boost.time > 0) this.boost.time = Math.max(0, this.boost.time - dt);
+    if (this.boosts.length) {
+      let n = 0;
+      for (const b of this.boosts) if ((b.time -= dt) > 0) this.boosts[n++] = b;
+      this.boosts.length = n;
+      this._sumBoosts();
+    }
     if (this.invuln > 0) this.invuln -= dt;
     if (this.shieldTimer > 0) this.shieldTimer -= dt;
     if (this.spinTimer > 0) {
@@ -480,9 +519,12 @@ export class Kart {
 
     // ---- бустеры на дороге
     if (!this.airborne) {
-      for (const z of env.boostZones || []) {
+      const zones = env.boostZones || [];
+      for (let i = 0; i < zones.length; i++) {
+        const z = zones[i];
         if (Math.abs(this.lateral - z.lat) < z.halfW + 0.4 && this.progress >= z.s0 && this.progress <= z.s1) {
-          if (this.boost.time < 0.9 || this.boost.kind !== 'pad') this.addBoost(1.15, 1.34, 'pad');
+          const key = 'pad' + i;
+          if (!this.boosts.some((b) => b.key === key && b.time >= 0.9)) this.addBoost(1.15, 1.34, 'pad', key);
         }
       }
     }
@@ -512,6 +554,7 @@ export class Kart {
       driftAngle: this.drift.angle,
       boosting: this.boost.time > 0,
       boostKind: this.boost.kind,
+      boostStack: this.boost.stack,
       airborne: this.airborne,
       spin: this.spinTimer > 0 ? this.spinAngle : 0,
       hop: 0,

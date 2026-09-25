@@ -876,6 +876,79 @@ kbd {
   left: max(20px, env(safe-area-inset-left));
   bottom: 18px;
 }
+/* реакции на буст/трюк/попадание: над спидометром, новые снизу */
+.hud-callouts {
+  position: absolute;
+  left: max(20px, env(safe-area-inset-left));
+  bottom: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  pointer-events: none;
+}
+.callout {
+  font-size: 30px;
+  line-height: 1.15;
+  white-space: nowrap;
+  color: #fff;
+  -webkit-text-stroke: 5px var(--ink);
+  paint-order: stroke fill;
+  transform-origin: left center;
+  animation: calloutIn 1.1s ease-out both;
+}
+.callout.boost1 {
+  color: #7fd0ff;
+}
+.callout.boost2 {
+  color: #ffb54a;
+}
+.callout.boost3 {
+  color: #ff8af0;
+}
+.callout.item {
+  color: #ffc24a;
+}
+.callout.stack {
+  color: #fff27a;
+}
+.callout.trick {
+  color: #8dff86;
+}
+.callout.block {
+  color: #7fe6ff;
+}
+.callout.good {
+  color: #ff8fc8;
+}
+.callout.hit,
+.callout.warn {
+  color: #ff6a6a;
+}
+.callout.ice {
+  color: #c8f6ff;
+}
+@keyframes calloutIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-18px) scale(0.6) skewX(-10deg);
+  }
+  12% {
+    opacity: 1;
+    transform: translateX(0) scale(1.12) skewX(-10deg);
+  }
+  24% {
+    transform: scale(1) skewX(-10deg);
+  }
+  78% {
+    opacity: 1;
+    transform: scale(1) skewX(-10deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(1) skewX(-10deg);
+  }
+}
 .hud-speed .spd {
   transform: skewX(-10deg);
   text-shadow: 3px 3px 0 var(--ink);
@@ -891,6 +964,30 @@ kbd {
 .hud.boosting .hud-speed .spd b {
   color: #ffe98a;
   text-shadow: 3px 3px 0 var(--ink), 0 0 18px #ff9a3c;
+}
+.hud-speed .spd .stk {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 26px;
+  line-height: 32px;
+  vertical-align: 10px;
+  color: #fff;
+  background: linear-gradient(180deg, #ffb03a, #ff3d7f);
+  box-shadow: 0 0 0 2px var(--ink), 0 0 14px rgba(255, 140, 60, 0.9);
+  text-shadow: 2px 2px 0 var(--ink);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.15s, transform 0.25s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.hud-speed .spd .stk.on {
+  opacity: 1;
+  transform: scale(1);
+}
+.hud-speed .spd .stk.x3 {
+  background: linear-gradient(180deg, #ff7ae6, #8a3cff);
+  box-shadow: 0 0 0 2px var(--ink), 0 0 16px rgba(255, 85, 224, 0.9);
 }
 .hud-speed .drift {
   display: flex;
@@ -987,9 +1084,9 @@ kbd {
 }
 .banner {
   position: absolute;
-  top: 44%;
-  padding: 8px 40px 10px;
-  font-size: clamp(26px, 4vw, 48px);
+  top: max(16%, 104px); /* под плашкой круга и таймером, над дорогой */
+  padding: 5px 34px 7px;
+  font-size: clamp(20px, 2.6vw, 32px);
   letter-spacing: 0.05em;
   opacity: 0;
   transform: translateX(-60px) skewX(-12deg);
@@ -1020,9 +1117,9 @@ kbd {
 }
 .warn {
   position: absolute;
-  top: 58%;
-  padding: 8px 28px;
-  font-size: clamp(26px, 4vw, 44px);
+  top: max(24%, 150px);
+  padding: 6px 24px;
+  font-size: clamp(22px, 3vw, 36px);
   color: #fff;
   background: #ff3a4a;
   border-radius: 10px;
@@ -1035,7 +1132,7 @@ kbd {
 }
 .hint {
   position: absolute;
-  bottom: 20%;
+  bottom: 5%;
   padding: 8px 20px;
   font-family: var(--font);
   font-weight: 900;
@@ -1185,6 +1282,19 @@ kbd {
 .hud.touch-on .hud-speed .spd b {
   font-size: 30px;
 }
+.hud.touch-on .hud-callouts {
+  bottom: auto;
+  top: 186px;
+}
+.hud.touch-on .callout {
+  font-size: 20px;
+  -webkit-text-stroke-width: 4px;
+}
+.hud.touch-on .hud-speed .spd .stk {
+  font-size: 18px;
+  line-height: 24px;
+  vertical-align: 4px;
+}
 .hud.touch-on .hud-speed .drift i {
   width: 30px;
   height: 9px;
@@ -1201,8 +1311,12 @@ kbd {
 .hud.touch-on .slot-name {
   display: none;
 }
+/* подсказка — внизу, в просвете между кнопками руля и действий */
 .hud.touch-on .hint {
-  bottom: 130px;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  max-width: max(160px, calc(100vw - 440px));
+  padding: 6px 12px;
+  font-size: 13px;
 }
 
 /* ------------------------------------------------------------------ анимации */
@@ -1373,6 +1487,28 @@ kbd {
 }
 @media (max-height: 640px) {
   .title-foot {
+    display: none;
+  }
+}
+/* низкий альбомный экран телефона: миникарта меньше, БУСТ ниже и меньше — не наезжают друг на друга */
+@media (max-height: 380px) {
+  .hud.touch-on .hud-map {
+    width: 104px;
+    height: 104px;
+  }
+  .hud.touch-on .t-boost {
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 108px);
+    width: 72px;
+    height: 72px;
+  }
+  /* реакций — не больше двух строк, иначе третья ложится на кнопку руля */
+  .hud.touch-on .hud-callouts {
+    top: 180px;
+  }
+  .hud.touch-on .callout {
+    font-size: 18px;
+  }
+  .hud.touch-on .callout:nth-last-child(n + 3) {
     display: none;
   }
 }

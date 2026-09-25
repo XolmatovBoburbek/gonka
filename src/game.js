@@ -279,6 +279,7 @@ export class Game {
     this.ui.hud.show(false);
     this.startDemo();
     this.ui.showScreen('title');
+    this.audio.setMusicIntensity(0);
     this.audio.playMusic('menu');
   }
 
@@ -447,6 +448,7 @@ export class Game {
       if (this.finishTimer > 3.2 && !this.resultsShown) {
         this.resultsShown = true;
         this.ui.showResults(race.results(), race.player, this.lastRecord);
+        this.audio.setMusicIntensity(0); // финальный круг ускорял музыку — результаты в обычном темпе
         this.audio.playMusic('results');
       }
     } else {
@@ -494,18 +496,20 @@ export class Game {
           a.sfx('go');
           this.ui.hud.countdown(0);
           break;
+        // реакции игрока — надписями у спидометра (hud.callout), а не над машинкой: там они закрывали дорогу
         case 'rocketStart':
-          this.ui.hud.banner('РАКЕТНЫЙ СТАРТ!', 'boost');
-          fx.popups.show('ВЖУХ!', player.pos, { color: '#6ff3ff', stroke: '#2a4bff' });
+          this.ui.hud.callout('РАКЕТНЫЙ СТАРТ!', 'boost1');
           break;
         case 'stall':
-          this.ui.hud.banner('Фальстарт…', 'warn');
+          this.ui.hud.callout('Фальстарт…', 'warn');
           break;
         case 'boost':
-          if (vol > 0.05 && (e.kind === 'pad' || e.kind === 'item' || e.kind === 'rocket' || e.kind === 'trick')) a.sfx('boost', { volume: vol });
+          // бусты складываются: второй поверх первого звучит выше
+          if (vol > 0.05 && (e.kind === 'pad' || e.kind === 'item' || e.kind === 'rocket' || e.kind === 'trick')) a.sfx('boost', { volume: vol, pitch: 1 + Math.min(2, e.stack - 1) * 0.12 });
           if (isP) {
             this.rig.shake(e.kind === 'item' ? 0.5 : 0.3);
             if (e.kind === 'item' || e.kind === 'pad') this.flash = Math.max(this.flash, 0.12);
+            if (e.added && e.stack >= 2) this.ui.hud.callout(`БУСТ ×${e.stack}!`, 'stack');
           }
           break;
         case 'boostFire': {
@@ -513,7 +517,7 @@ export class Game {
           const L = e.level;
           if (vol > 0.05) a.sfx('miniturbo' + L, { volume: vol });
           if (isP) {
-            fx.popups.show(['', 'БУСТ!', 'ТУРБО!', 'УЛЬТРА!'][L], player.pos, { color: ['', '#6fc8ff', '#ffb03a', '#ff7ae6'][L], stroke: '#2a1a5a', life: 0.6 + L * 0.1, scale: 2 + L * 0.3 });
+            this.ui.hud.callout(['', 'БУСТ!', 'СУПЕР-БУСТ!', 'УЛЬТРА-БУСТ!'][L], 'boost' + L);
             this.rig.shake(0.15 + L * 0.12);
             this.flash = Math.max(this.flash, 0.04 + L * 0.04);
           }
@@ -542,7 +546,7 @@ export class Game {
           break;
         case 'trick':
           if (vol > 0.05) a.sfx('trick', { volume: vol });
-          if (isP) fx.popups.show('ТРЮК!', player.pos, { color: '#7dff7a', stroke: '#1a6a3a', life: 0.8, scale: 2.4 });
+          if (isP) this.ui.hud.callout('ТРЮК!', 'trick');
           break;
         case 'land':
           if (vol > 0.05) a.sfx('land', { volume: vol * Math.min(1, e.impact / 20) });
@@ -572,7 +576,7 @@ export class Game {
         case 'useTurbo':
           if (isP) {
             this.ui.hud.setItem(null);
-            fx.popups.show('ТУРБО!', player.pos, { color: '#ffb03a', stroke: '#b3261e' });
+            this.ui.hud.callout('ТУРБО!', 'item');
           }
           break;
         case 'useOrb':
@@ -589,18 +593,21 @@ export class Game {
           break;
         case 'shieldBreak':
           if (vol > 0.05) a.sfx('shieldBreak', { volume: vol });
-          if (isP) fx.popups.show('БЛОК!', player.pos, { color: '#6fe0ff', stroke: '#1a4a8a' });
+          if (isP) this.ui.hud.callout('БЛОК!', 'block');
           break;
         case 'hit':
+          // над соперником — маленькая надпись (она бывает прямо по курсу), про себя — у спидометра
           if (e.kind === 'freeze') {
             if (vol > 0.05) a.sfx('freeze', { volume: vol });
-            fx.popups.show('ДЗЫНЬ!', k.pos, { color: '#bff4ff', stroke: '#2a6aa8', scale: isP ? 3 : 2.2 });
+            if (isP) this.ui.hud.callout('ДЗЫНЬ!', 'ice');
+            else fx.popups.show('ДЗЫНЬ!', k.pos, { color: '#bff4ff', stroke: '#2a6aa8', scale: 1.5, life: 0.7 });
           } else {
             if (vol > 0.05) {
               a.sfx('hit', { volume: vol });
               a.sfx('spin', { volume: vol * 0.7 });
             }
-            fx.popups.show('БАХ!', k.pos, { color: '#ffd84a', stroke: '#d8263a', scale: isP ? 3 : 2.2 });
+            if (isP) this.ui.hud.callout('БАХ!', 'hit');
+            else fx.popups.show('БАХ!', k.pos, { color: '#ffd84a', stroke: '#d8263a', scale: 1.5, life: 0.7 });
           }
           if (isP) {
             this.rig.shake(0.8);
@@ -611,7 +618,7 @@ export class Game {
             const v = race.views[race.karts.indexOf(k)];
             if (v) v.setExpression('hurt', 1.6);
           }
-          if (e.by === player && !demo && k !== player) this.ui.hud.banner('Попадание!', 'hit');
+          if (e.by === player && !demo && k !== player) this.ui.hud.callout('ПОПАДАНИЕ!', 'good');
           break;
         case 'unfreeze':
           if (vol > 0.05) a.sfx('shatter', { volume: vol });

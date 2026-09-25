@@ -28,8 +28,9 @@ export class Hud {
       </div>
       <div class="hud-map"><canvas width="240" height="240"></canvas></div>
       <div class="hud-place"><span class="num">1</span><span class="of">/8</span></div>
+      <div class="hud-callouts"></div>
       <div class="hud-speed">
-        <div class="spd"><b>0</b><small>км/ч</small></div>
+        <div class="spd"><b>0</b><small>км/ч</small><span class="stk"></span></div>
         <div class="drift"><i class="d1"></i><i class="d2"></i><i class="d3"></i><span class="bkey">F</span></div>
       </div>
       <div class="hud-center">
@@ -70,9 +71,11 @@ export class Hud {
     this.placeOf = this.$('.hud-place .of');
     this.placeBox = this.$('.hud-place');
     this.spd = this.$('.spd b');
+    this.stkEl = this.$('.spd .stk');
     this.driftBars = [this.$('.d1'), this.$('.d2'), this.$('.d3')];
     this.countEl = this.$('.count');
     this.bannerEl = this.$('.banner');
+    this.calloutsEl = this.$('.hud-callouts');
     this.warnEl = this.$('.warn');
     this.hintEl = this.$('.hint');
     this.introEl = this.$('.hud-intro');
@@ -101,7 +104,15 @@ export class Hud {
   _setupTouch() {
     const input = this.ui.game.input;
     this.setTouch(!!window.matchMedia?.('(pointer: coarse)').matches);
-    window.addEventListener('pointerdown', (e) => e.pointerType === 'touch' && this.setTouch(true), { passive: true });
+    window.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (e.pointerType !== 'touch') return;
+        input.lastDevice = 'touch'; // иначе после геймпада hud.update гасил кнопки в следующем же кадре
+        this.setTouch(true);
+      },
+      { passive: true }
+    );
     window.addEventListener('keydown', () => this.setTouch(false));
     const t = input.touch;
     const state = { left: false, right: false };
@@ -152,6 +163,7 @@ export class Hud {
     this.countEl.className = 'count';
     this.countEl.textContent = '';
     this.bannerEl.className = 'banner';
+    this.calloutsEl.textContent = '';
     this.warnEl.classList.remove('on');
     this.hintEl.className = 'hint';
     this.placeOf.textContent = '/' + race.karts.length;
@@ -186,6 +198,17 @@ export class Hud {
     }
   }
 
+  /** Короткая реакция (буст, трюк, попадание) у спидометра — сбоку, не поверх дороги. */
+  callout(text, style = '') {
+    const box = this.calloutsEl;
+    const el = document.createElement('div');
+    el.className = 'callout ' + style;
+    el.textContent = text;
+    el.addEventListener('animationend', () => el.remove());
+    box.appendChild(el);
+    while (box.children.length > 3) box.firstChild.remove();
+  }
+
   banner(text, style = '') {
     const el = this.bannerEl;
     el.className = 'banner';
@@ -193,7 +216,7 @@ export class Hud {
     el.textContent = text;
     el.classList.add('on');
     if (style) el.classList.add(style);
-    this.bannerTimer = 2.2;
+    this.bannerTimer = 1.8;
   }
 
   lapBanner(lap, total) {
@@ -286,7 +309,7 @@ export class Hud {
     }
     // буст-шкала: три деления копятся в заносе; F тратит все полные сразу
     const m = p.boostMeter;
-    const mKey = Math.round(m * 40);
+    const mKey = Math.floor(m * 40); // floor: переход через целое деление всегда перерисовывает шкалу
     if (this._last.meter !== mKey) {
       this.driftBars.forEach((b, i) => {
         const f = Math.max(0, Math.min(1, m - i));
@@ -297,6 +320,15 @@ export class Hud {
       this._last.meter = mKey;
     }
     this.el.classList.toggle('boosting', p.boost.time > 0);
+    // несколько бустов сразу (нитро на ускорителе) — их прибавки сложились: «×2», «×3»
+    const stk = p.boost.time > 0 ? p.boost.stack : 0;
+    if (this._last.stk !== stk) {
+      if (stk >= 2) {
+        this.stkEl.textContent = '×' + stk;
+        this.stkEl.className = 'stk on' + (stk >= 3 ? ' x3' : '');
+      } else this.stkEl.className = 'stk';
+      this._last.stk = stk;
+    }
 
     // рулетка
     if (this.roulette) {

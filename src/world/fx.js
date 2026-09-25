@@ -341,12 +341,12 @@ export class Effects {
     }
   }
 
-  flame(pos, back, color = C(0xff8a3c).multiplyScalar(2.5)) {
+  flame(pos, back, color = C(0xff8a3c).multiplyScalar(2.5), scale = 1) {
     this.glowFx.emit({
       pos,
-      vel: { x: back.x * 6 + (Math.random() - 0.5), y: 0.5 + Math.random(), z: back.z * 6 + (Math.random() - 0.5) },
+      vel: { x: back.x * 6 * scale + (Math.random() - 0.5), y: 0.5 + Math.random(), z: back.z * 6 * scale + (Math.random() - 0.5) },
       color,
-      size: 0.7 + Math.random() * 0.4,
+      size: (0.7 + Math.random() * 0.4) * scale,
       sizeEnd: 0.1,
       life: 0.22,
       drag: 3,
