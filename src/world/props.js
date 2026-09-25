@@ -387,7 +387,7 @@ export function makeRocks(points, opts = {}) {
     const s = p.s ?? 1 + rnd() * 2;
     return trs(p.x, p.y, p.z, rnd() * 6.28, new THREE.Vector3(s * (0.8 + rnd() * 0.5), s * (0.6 + rnd() * 0.5), s * (0.8 + rnd() * 0.5)));
   });
-  return instanced([{ geo, mat: toon(opts.color ?? 0x9a948e), outline: opts.outline ?? 0.05, outlineColor: 0x2a2428 }], mats, { name: 'rocks', receiveShadow: true });
+  return instanced([{ geo, mat: toon(opts.color ?? 0x9a948e), outline: opts.outline ?? 0.05, outlineColor: 0x2a2428 }], mats, { name: 'rocks', receiveShadow: true, chunk: opts.chunk ?? 170 });
 }
 
 export function makeGrass(points, opts = {}) {
@@ -408,7 +408,7 @@ export function makeGrass(points, opts = {}) {
     mats.push(trs(p.x, p.y, p.z, rnd() * 6.28, 0.8 + rnd() * 0.9));
     cols.push(new THREE.Color().setHSL(0.26 + rnd() * 0.06, 0.5, 0.75 + rnd() * 0.25));
   }
-  return instanced([{ geo, mat: toon(0xffffff, { vertexColors: true, ramp: 'soft' }), tint: true, shadow: false }], mats, { colors: cols, castShadow: false, name: 'grass' });
+  return instanced([{ geo, mat: toon(0xffffff, { vertexColors: true, ramp: 'soft' }), tint: true, shadow: false }], mats, { colors: cols, castShadow: false, name: 'grass', chunk: opts.chunk ?? 170 });
 }
 
 export function makeFlowers(points, palette = [0xffffff, 0xffe066, 0xff8fc1, 0xb58cff], opts = {}) {
@@ -435,7 +435,7 @@ export function makeFlowers(points, palette = [0xffffff, 0xffe066, 0xff8fc1, 0xb
       { geo: merge([center]), mat: toon(0xffd23a, { side: THREE.DoubleSide }), shadow: false },
     ],
     mats,
-    { colors: cols, castShadow: false, name: 'flowers' }
+    { colors: cols, castShadow: false, name: 'flowers', chunk: opts.chunk ?? 170 }
   );
 }
 
@@ -454,6 +454,7 @@ export function makeBushes(points, opts = {}) {
   return instanced([{ geo, mat: toon(0xffffff, { vertexColors: true, rim: 0.25, ramp: 'soft' }), tint: true, outline: opts.outline ? 0.05 : 0, outlineColor: 0x1a3a22 }], mats, {
     colors: cols,
     name: 'bushes',
+    chunk: opts.chunk ?? 170,
   });
 }
 
