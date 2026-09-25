@@ -108,9 +108,14 @@ export class CameraRig {
     this.orbitAngle += dt * 0.35;
     const a = kart.heading + Math.PI * 0.75 + this.orbitAngle;
     const desired = kart.pos.clone().add(new THREE.Vector3(Math.sin(a) * 7, 2.6, Math.cos(a) * 7));
-    this.pos.lerp(desired, 1 - Math.exp(-dt * 3));
     const lookT = kart.pos.clone();
     lookT.y += 1.2;
+    if (this.snapNext) {
+      this.snapNext = false;
+      this.pos.copy(desired);
+      this.look.copy(lookT);
+    }
+    this.pos.lerp(desired, 1 - Math.exp(-dt * 3));
     this.look.lerp(lookT, 1 - Math.exp(-dt * 6));
     this.fov += (52 - this.fov) * (1 - Math.exp(-dt * 2));
     this.roll *= 0.95;

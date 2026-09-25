@@ -194,6 +194,7 @@ export class Game {
       skipIntro: !!opts.skipIntro,
     });
     this.autopilot = !!opts.autopilot;
+    this.audio.duck(0, 0.05);
     this.state = 'race';
     this.paused = false;
     this.finishTimer = 0;
@@ -219,7 +220,7 @@ export class Game {
     this.paused = false;
     this.state = 'menu';
     this.audio.stopEngine();
-    this.audio.resumeAll();
+    this.audio.duck(0, 0.05);
     this.ui.hud.show(false);
     this.startDemo();
     this.ui.showScreen('title');
@@ -254,8 +255,8 @@ export class Game {
     this.ui.showPause(p);
     if (p) {
       this.audio.stopEngine();
-      this.audio.duck(0.35, 0.3);
-    } else this.audio.duck(1, 0.3);
+      this.audio.duck(0.6, 3600); // приглушить музыку, пока открыта пауза
+    } else this.audio.duck(0, 0.05);
   }
 
   // ------------------------------------------------------------------ цикл
@@ -309,10 +310,16 @@ export class Game {
       const k = r.karts[this.demoTarget];
       this.rig.snapChase(k);
     }
-    const k = r.karts[this.demoTarget];
+    let k = r.karts[this.demoTarget];
     if (this.ui.currentScreen === 'select') {
-      // на экране выбора — медленный облёт выбранного персонажа на старте
-      this.rig.updateChase(dt, k);
+      // на экране выбора камера облетает карт выбранного персонажа
+      const sel = r.karts.find((x) => x.char.id === this.settings.character);
+      if (sel) k = sel;
+      if (this._selKart !== k) {
+        this._selKart = k;
+        this.rig.snapNext = true;
+      }
+      this.rig.updateFinish(dt, k);
     } else if (this.demoMode === 'orbit') {
       this.rig.updateFinish(dt, k);
     } else {

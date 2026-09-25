@@ -167,6 +167,7 @@ export class Kart {
   }
 
   respawn() {
+    this._respawns = (this._respawns || 0) + 1;
     const back = this.progress - 4;
     this.placeAt(back, 0);
     this.speed = 0;
