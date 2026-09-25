@@ -64,6 +64,16 @@ export function buildWorld(def, ctx) {
           if (seen.has(m)) continue;
           seen.add(m);
           for (const k of ['map', 'emissiveMap']) if (m[k] && !seen.has(m[k])) (seen.add(m[k]), m[k].dispose());
+          // текстуры в uniform'ах шейдеров (небо, вода, вывески и т.п.)
+          if (m.uniforms) {
+            for (const u of Object.values(m.uniforms)) {
+              const v = u && u.value;
+              if (v && v.isTexture && !seen.has(v)) {
+                seen.add(v);
+                v.dispose();
+              }
+            }
+          }
           m.dispose();
         }
       });

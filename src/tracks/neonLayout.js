@@ -42,8 +42,8 @@ export const CANAL = [
 ];
 export const CANAL_HW = 13;
 
-// телебашня внутри западной петли
-export const TOWER = [-108, -92];
+// телебашня: впереди по эстакаде и при подъёме на неё
+export const TOWER = [-125, -305];
 // парк с сакурами внутри восточной петли
 export const PARK = { x: 112, z: 108, r: 52 };
 

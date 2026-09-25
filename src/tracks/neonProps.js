@@ -1,5 +1,6 @@
 // Декорации "Неон-Токио": небоскрёбы с процедурными окнами (один InstancedMesh), неоновые вывески из атласа,
-// голографические экраны, телебашня, мигающие огни, фонари, автоматы с напитками, бумажные фонарики и поезд.
+// голографические экраны, телебашня, мигающие огни, фонари, автоматы, фонарики-тётин, электричка, прожекторы,
+// зебры, указатели хайвея и ворота аллеи.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toon, glow, outlineMaterial, outlineGeometry, normalizeGeometry, softCircleTexture } from '../world/toon.js';
@@ -19,8 +20,10 @@ function fogUniforms(extra) {
   return THREE.UniformsUtils.merge([THREE.UniformsLib.fog, extra]);
 }
 
-function merge(list) {
-  return mergeGeometries(list.map((g) => normalizeGeometry(g)));
+/** Слить геометрии (после нормализации атрибутов) в одну. */
+export function merge(list) {
+  const geos = list.filter(Boolean).map((g) => normalizeGeometry(g));
+  return geos.length ? mergeGeometries(geos) : new THREE.BufferGeometry();
 }
 
 function box(w, h, d, x = 0, y = 0, z = 0) {
@@ -91,7 +94,8 @@ const bFrag = /* glsl */ `
   ${HASH}
   void main() {
     float seed = vInfo.x;
-    float type = vInfo.y;
+    float crown = step(3.5, vInfo.y); // надстройка на крыше: без витрин и подсветки снизу
+    float type = mod(vInfo.y, 4.0);
     float lit = vInfo.z;
     int hue = int(vInfo.w + 0.5);
     vec3 neon = uNeon[hue];
@@ -123,7 +127,7 @@ const bFrag = /* glsl */ `
       float fh = type < 1.5 ? 3.4 : 2.8;
       float nc = max(1.0, floor((W - 1.2) / cw));
       float cwf = (W - 1.2) / nc;
-      float base = 4.4;
+      float base = crown > 0.5 ? 1.2 : 4.4;
       float uu = (u - 0.6) / cwf;
       float vv = (y - base) / fh;
       vec2 cell = floor(vec2(uu, vv));
@@ -134,6 +138,9 @@ const bFrag = /* glsl */ `
       else if (type < 1.5) win = step(0.22, f.x) * step(f.x, 0.78) * step(0.26, f.y) * step(f.y, 0.8);
       else win = step(0.04, f.x) * step(f.x, 0.96) * step(0.14, f.y) * step(f.y, 0.92);
       win *= inside;
+      float fw = max(fwidth(uu), fwidth(vv));
+      // переплёт окна вблизи
+      if (type < 1.5) win *= 1.0 - step(abs(f.x - 0.5), 0.022) * (1.0 - smoothstep(0.04, 0.1, fw));
       float area = (type < 0.5 ? 0.46 : (type < 1.5 ? 0.3 : 0.72)) * inside;
       // окна горят группами по 1-3 и целыми этажами
       float grp = 1.0 + floor(h12(vec2(seed, 1.7)) * 3.0);
@@ -145,19 +152,18 @@ const bFrag = /* glsl */ `
       float warm = step(0.42, h12(vec2(floor(cell.x / 4.0) + face * 7.0, seed * 0.29 + floor(cell.y / 3.0))));
       vec3 wc = mix(uWin[1], uWin[0], warm);
       if (r2 > 0.94) wc = r2 > 0.97 ? uWin[3] : uWin[4];
-      wc *= 0.7 + 0.3 * r2;
+      wc *= (0.66 + 0.3 * r2) * (0.8 + 0.35 * clamp((f.y - 0.2) * 1.6, 0.0, 1.0));
       vec3 glass = mix(vec3(0.02, 0.025, 0.06), vec3(0.06, 0.05, 0.14), clamp(f.y, 0.0, 1.0));
       if (type > 1.5) glass = mix(glass, neon * 0.12 + vec3(0.03, 0.05, 0.12), y / H);
       vec3 nearCol = mix(wall, mix(glass, wc, on), win);
       // вдали — усреднённый цвет вместо мелкого узора (без ряби)
       vec3 avgWin = mix(uWin[1], uWin[0], 0.6) * 0.8;
       vec3 farCol = mix(wall, mix(vec3(0.04, 0.04, 0.1), avgWin, lit * 0.8), area);
-      float fw = max(fwidth(uu), fwidth(vv));
       col = mix(nearCol, farCol, smoothstep(0.18, 0.5, fw));
       // межэтажные пояса у стеклянных башен
       if (type > 1.5) col = mix(col, wall * 1.4, (1.0 - win) * 0.4);
       // первый этаж: витрины и козырёк
-      if (y < base) {
+      if (y < base && crown < 0.5) {
         float slot = floor(u / 6.5);
         float shopOn = step(0.3, h12(vec2(slot + face * 3.0, seed * 0.5)));
         vec3 sc = uNeon[int(mod(float(hue) + slot, 7.0))];
@@ -168,7 +174,7 @@ const bFrag = /* glsl */ `
         col = mix(col, sc * (0.5 + 0.9 * shopOn), awning);
       }
       // цветная подсветка улицы снизу
-      col += neon * 0.22 * exp(-y * 0.22);
+      col += neon * 0.22 * exp(-y * 0.22) * (1.0 - crown);
       // неоновые контуры: верх фасада и углы
       float trimOn = step(0.55, fract(seed * 0.0731));
       float trim = step(H - 0.55, y) * step(y, H - 0.2) * trimOn;
@@ -185,7 +191,7 @@ const bFrag = /* glsl */ `
 
 /**
  * Все здания города — один InstancedMesh с процедурным фасадом.
- * list: [{x, y, z, w, d, h, ry, color, type(0 офис|1 жилой|2 стекло), lit(0..1), hue(0..6), seed}]
+ * list: [{x, y, z, w, d, h, ry, color, type(0 офис|1 жилой|2 стекло), crown, lit(0..1), hue(0..6), seed}]
  */
 export function makeBuildings(list, { moonDir, moon = 0x8a90d8, ambient = 0x4a4270 } = {}) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -216,7 +222,7 @@ export function makeBuildings(list, { moonDir, moon = 0x8a90d8, ambient = 0x4a42
     q.setFromAxisAngle(up, b.ry || 0);
     m.compose(new THREE.Vector3(b.x, b.y ?? -0.3, b.z), q, new THREE.Vector3(b.w, b.h, b.d));
     im.setMatrixAt(i, m);
-    info.set([Math.floor(b.seed ?? i * 7.3) % 1000, b.type ?? 0, b.lit ?? 0.5, b.hue ?? 0], i * 4);
+    info.set([Math.floor(b.seed ?? i * 7.3) % 1000, (b.type ?? 0) + (b.crown ? 4 : 0), b.lit ?? 0.5, b.hue ?? 0], i * 4);
     c.set(b.color ?? 0x2a2a48);
     cols.set([c.r, c.g, c.b], i * 3);
   });
@@ -243,87 +249,87 @@ export function makeSignAtlas(seed = 5) {
   g.fillStyle = '#05030a';
   g.fillRect(0, 0, W, H);
   const rnd = mulberry32(seed);
-  const rects = { h: [], v: [] };
+  const rects = { h: [], v: [], hLight: [], vLight: [] };
   const drawSign = (x, y, w, h, word, vertical, k) => {
     const pad = 6;
     const col = NEON[k % NEON.length];
-    const light = rnd() < 0.3; // "лайтбокс": яркий фон с тёмным текстом
+    const light = rnd() < 0.28; // "лайтбокс": светлый фон с тёмным текстом
     g.save();
     g.translate(x, y);
-    const rr = 14;
     const path = () => {
       g.beginPath();
-      g.roundRect(pad, pad, w - pad * 2, h - pad * 2, rr);
+      g.roundRect(pad, pad, w - pad * 2, h - pad * 2, 14);
     };
     if (light) {
       const grd = g.createLinearGradient(0, 0, vertical ? w : 0, vertical ? 0 : h);
-      const base = ['#fff6d8', '#ffffff', '#ffe14a', '#ff5a7a', '#8af0ff'][Math.floor(rnd() * 5)];
+      const base = ['#fff0c8', '#f4f4ff', '#ffe14a', '#ff6a8a', '#8af0ff'][Math.floor(rnd() * 5)];
       grd.addColorStop(0, base);
       grd.addColorStop(1, '#ffffff');
       g.fillStyle = grd;
       path();
       g.fill();
-      g.lineWidth = 6;
+      g.lineWidth = 8;
       g.strokeStyle = col;
       path();
       g.stroke();
     } else {
-      g.fillStyle = ['#140a24', '#0a1224', '#1a0818', '#101010'][Math.floor(rnd() * 4)];
+      g.fillStyle = ['#1c0c30', '#0c1630', '#260c22', '#141420'][Math.floor(rnd() * 4)];
       path();
       g.fill();
       g.shadowColor = col;
-      g.shadowBlur = 14;
-      g.lineWidth = 5;
+      g.shadowBlur = 12;
+      g.lineWidth = 7;
       g.strokeStyle = col;
       path();
       g.stroke();
-      g.lineWidth = 2;
-      g.strokeStyle = '#ffffff';
+      g.shadowBlur = 0;
+      g.lineWidth = 2.5;
+      g.strokeStyle = 'rgba(255,255,255,0.9)';
       path();
       g.stroke();
     }
     // текст
-    g.shadowBlur = 0;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
+    g.lineJoin = 'round';
     const chars = vertical ? [...word] : [word];
     const n = chars.length;
-    const size = vertical ? Math.min(w * 0.68, ((h - 40) / n) * 0.86) : Math.min(h * 0.62, ((w - 60) / Math.max(2, [...word].length)) * 1.05);
-    g.font = `900 ${Math.floor(size)}px ${JP_FONT}`;
+    const size = Math.floor(vertical ? Math.min(w * 0.7, ((h - 40) / n) * 0.86) : Math.min(h * 0.64, ((w - 60) / Math.max(2, [...word].length)) * 1.05));
+    g.font = `900 ${size}px ${JP_FONT}`;
+    const ink = ['#1a0a20', '#c0102a', '#10204a'][Math.floor(rnd() * 3)];
     chars.forEach((ch, i) => {
       const tx = w / 2;
       const ty = vertical ? 20 + ((h - 40) * (i + 0.5)) / n : h / 2 + 4;
       if (light) {
-        g.fillStyle = ['#1a0a20', '#c0102a', '#10204a'][Math.floor(rnd() * 3)];
+        g.fillStyle = ink;
         g.fillText(ch, tx, ty);
       } else {
+        // толстая цветная трубка + белая сердцевина: читается и на мелких мипах
         g.shadowColor = col;
-        g.shadowBlur = 22;
-        g.fillStyle = col;
-        g.fillText(ch, tx, ty);
-        g.shadowBlur = 8;
-        g.fillText(ch, tx, ty);
+        g.shadowBlur = 16;
+        g.lineWidth = size * 0.16;
+        g.strokeStyle = col;
+        g.strokeText(ch, tx, ty);
         g.shadowBlur = 0;
-        g.fillStyle = 'rgba(255,255,255,0.85)';
-        g.font = `900 ${Math.floor(size * 0.94)}px ${JP_FONT}`;
+        g.fillStyle = '#fff4fc';
         g.fillText(ch, tx, ty);
-        g.font = `900 ${Math.floor(size)}px ${JP_FONT}`;
       }
     });
     g.restore();
+    return light;
   };
   // горизонтальные: 2 колонки × 8 рядов
   for (let i = 0; i < 16; i++) {
     const cx = (i % 2) * 512;
     const cy = Math.floor(i / 2) * 128;
-    drawSign(cx, cy, 512, 128, H_WORDS[i], false, i);
+    rects.hLight.push(drawSign(cx, cy, 512, 128, H_WORDS[i], false, i));
     rects.h.push([cx / W, 1 - (cy + 128) / H, 512 / W, 128 / H]);
   }
   // вертикальные: 8 колонок × 2 ряда
   for (let i = 0; i < 16; i++) {
     const cx = 1024 + (i % 8) * 128;
     const cy = Math.floor(i / 8) * 512;
-    drawSign(cx, cy, 128, 512, V_WORDS[i], true, i + 3);
+    rects.vLight.push(drawSign(cx, cy, 128, 512, V_WORDS[i], true, i + 3));
     rects.v.push([cx / W, 1 - (cy + 512) / H, 128 / W, 512 / H]);
   }
   const tex = new THREE.CanvasTexture(c);
@@ -366,7 +372,7 @@ const signFrag = /* glsl */ `
       float k = fract(uTime * 0.17 + vFx.y);
       if (k < 0.07) fl = 0.25 + 0.75 * step(0.5, fract(uTime * 13.0 + vFx.y * 5.0));
     }
-    vec3 col = t.rgb * (0.75 + vFx.x * smoothstep(0.3, 1.0, l)) * fl;
+    vec3 col = t.rgb * (0.8 + vFx.x * smoothstep(0.3, 1.0, l)) * fl;
     gl_FragColor = vec4(col, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -385,6 +391,8 @@ export function makeSigns(list, atlas) {
   const uniforms = fogUniforms({ uMap: { value: null }, uTime: { value: 0 } });
   uniforms.uMap.value = atlas.tex;
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: signVert, fragmentShader: signFrag, fog: true });
+  // текстуры в uniforms общий dispose мира не видит — освобождаем вместе с материалом
+  mat.addEventListener('dispose', () => atlas.tex.dispose());
   const im = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -393,9 +401,12 @@ export function makeSigns(list, atlas) {
     q.setFromAxisAngle(up, s.ry);
     m.compose(new THREE.Vector3(s.x, s.y, s.z), q, new THREE.Vector3(s.w, s.h, 1));
     im.setMatrixAt(i, m);
-    const r = (s.kind === 'v' ? atlas.rects.v : atlas.rects.h)[s.index % 16];
+    const v = s.kind === 'v';
+    const r = (v ? atlas.rects.v : atlas.rects.h)[s.index % 16];
+    const light = (v ? atlas.rects.vLight : atlas.rects.hLight)[s.index % 16];
     rect.set(r, i * 4);
-    fx.set([s.bright ?? 2.2, s.flicker ? 0.05 + (i * 0.618) % 0.9 : 0], i * 2);
+    // лайтбоксы и так яркие — им меньше свечения
+    fx.set([(s.bright ?? 1.4) * (light ? 0.3 : 1), s.flicker ? 0.05 + ((i * 0.618) % 0.9) : 0], i * 2);
   });
   im.count = n;
   geo.setAttribute('aRect', new THREE.InstancedBufferAttribute(rect, 4));
@@ -522,6 +533,7 @@ export function makeHoloScreen(w, h, { mode = 0, text = 'ネオン東京 ♥ SAK
     fragmentShader: holoFrag,
     fog: true,
   });
+  mat.addEventListener('dispose', () => uniforms.uText.value.dispose());
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
   mesh.name = 'holo';
   mesh.userData.update = (dt) => (uniforms.uTime.value += dt);
@@ -530,44 +542,45 @@ export function makeHoloScreen(w, h, { mode = 0, text = 'ネオン東京 ♥ SAK
 
 // ------------------------------------------------------------------ мигающие огни (билборды)
 const blinkVert = /* glsl */ `
-  attribute vec4 aB; // xyz — центр, w — фаза
+  attribute vec4 aB; // xyz — центр, w — фаза (< 0 — горит постоянно)
+  attribute vec4 aC; // rgb — цвет, a — размер
   uniform float uTime;
-  uniform float uSize;
   varying vec2 vUv;
-  varying float vI;
+  varying vec3 vC;
   #include <common>
   #include <fog_pars_vertex>
   void main() {
     vUv = uv;
     vec4 mvPosition = viewMatrix * vec4(aB.xyz, 1.0);
     float d = -mvPosition.z;
-    float s = uSize * (1.0 + d * 0.006);
-    mvPosition.xy += position.xy * s;
+    mvPosition.xy += position.xy * aC.a * (1.0 + d * 0.006);
     float ph = aB.w;
-    vI = ph < 0.0 ? 1.0 : 0.12 + 1.0 * pow(max(0.0, sin(uTime * 2.4 + ph * 6.2831)), 12.0);
+    float k = ph < 0.0 ? 1.0 : 0.12 + pow(max(0.0, sin(uTime * 2.4 + ph * 6.2831)), 12.0);
+    vC = aC.rgb * k;
     gl_Position = projectionMatrix * mvPosition;
     #include <fog_vertex>
   }
 `;
 const blinkFrag = /* glsl */ `
-  uniform vec3 uColor;
   varying vec2 vUv;
-  varying float vI;
+  varying vec3 vC;
   #include <common>
   #include <fog_pars_fragment>
   void main() {
     float r = length(vUv - 0.5) * 2.0;
     float a = smoothstep(1.0, 0.0, r);
     float core = smoothstep(0.35, 0.0, r);
-    vec3 col = uColor * (a * a * 0.8 + core * 2.5) * vI;
-    gl_FragColor = vec4(col, 1.0);
+    gl_FragColor = vec4(vC * (a * a * 0.8 + core * 2.5), 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
     #include <fog_fragment>
   }
 `;
 
-/** Огни-билборды (аддитивные). points: [{x,y,z, phase}] (phase < 0 — горит постоянно). */
+/**
+ * Огни-билборды (аддитивные), все одним draw call.
+ * points: [{x,y,z, phase, color, size}] (phase < 0 — горит постоянно, иначе мигает).
+ */
 export function makeBlinkers(points, { color = 0xff2a3a, size = 0.9 } = {}) {
   const base = new THREE.PlaneGeometry(1, 1);
   const geo = new THREE.InstancedBufferGeometry();
@@ -575,10 +588,17 @@ export function makeBlinkers(points, { color = 0xff2a3a, size = 0.9 } = {}) {
   geo.setAttribute('position', base.getAttribute('position'));
   geo.setAttribute('uv', base.getAttribute('uv'));
   const arr = new Float32Array(points.length * 4);
-  points.forEach((p, i) => arr.set([p.x, p.y, p.z, p.phase ?? i * 0.371], i * 4));
+  const col = new Float32Array(points.length * 4);
+  const c = new THREE.Color();
+  points.forEach((p, i) => {
+    arr.set([p.x, p.y, p.z, p.phase ?? i * 0.371], i * 4);
+    c.set(p.color ?? color);
+    col.set([c.r, c.g, c.b, p.size ?? size], i * 4);
+  });
   geo.setAttribute('aB', new THREE.InstancedBufferAttribute(arr, 4));
+  geo.setAttribute('aC', new THREE.InstancedBufferAttribute(col, 4));
   geo.instanceCount = points.length;
-  const uniforms = fogUniforms({ uTime: { value: 0 }, uSize: { value: size }, uColor: { value: new THREE.Color(color) } });
+  const uniforms = fogUniforms({ uTime: { value: 0 } });
   const mat = new THREE.ShaderMaterial({
     uniforms,
     vertexShader: blinkVert,
@@ -890,11 +910,11 @@ export function makeTower({ height = 150, base = 19, outline = true } = {}) {
   win2.translate(0, H * 0.66, 0);
   group.add(new THREE.Mesh(merge([win1, win2]), glow(0xffe0a0, 2.4)));
   // подсветка: тёплые точки вдоль ног + огни на вершине
-  const blink = [];
-  blink.push({ x: 0, y: H + 1.2, z: 0, phase: 0 });
-  for (const c of corners) blink.push({ x: c[0] * 2.2, y: legTop + 7.8, z: c[1] * 2.2, phase: 0.5 });
-  const warm = lights.map((p) => ({ x: p.x, y: p.y, z: p.z, phase: -1 }));
-  return { group, blink, warm };
+  // огни для makeBlinkers (в локальных координатах башни)
+  const blink = [{ x: 0, y: H + 1.2, z: 0, phase: 0, color: 0xff2a3a, size: 2.2 }];
+  for (const c of corners) blink.push({ x: c[0] * 2.2, y: legTop + 7.8, z: c[1] * 2.2, phase: 0.5, color: 0xff2a3a, size: 2.2 });
+  for (const p of lights) blink.push({ x: p.x, y: p.y, z: p.z, phase: -1, color: 0xffb060, size: 1.6 });
+  return { group, blink };
 }
 
 // ------------------------------------------------------------------ поезд на эстакаде
@@ -951,6 +971,338 @@ export function makeTrain(a, b, { cars = 7, speed = 26, outline = true } = {}) {
       for (const im of meshes) im.setMatrixAt(i, m);
     }
     for (const im of meshes) im.instanceMatrix.needsUpdate = true;
+  };
+  update(0);
+  return { group, update };
+}
+
+// ------------------------------------------------------------------ прожекторы в небе
+const beamVert = /* glsl */ `
+  varying float vT;
+  varying float vEdge;
+  void main() {
+    vT = uv.y;
+    mat4 m = modelMatrix * instanceMatrix;
+    vec4 wp = m * vec4(position, 1.0);
+    vec3 n = normalize(mat3(m) * normal);
+    vec3 axis = normalize(mat3(m) * vec3(0.0, 1.0, 0.0));
+    vec3 v = normalize(cameraPosition - wp.xyz);
+    // луч, смотрящий прямо в камеру, гасим — иначе аддитивные стенки конуса слепят
+    vEdge = abs(dot(n, v)) * (1.0 - smoothstep(0.55, 0.9, abs(dot(axis, v))));
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+const beamFrag = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uAlpha;
+  varying float vT;
+  varying float vEdge;
+  void main() {
+    float a = uAlpha * pow(vEdge, 1.5) * (1.0 - vT) * smoothstep(0.0, 0.04, vT);
+    gl_FragColor = vec4(uColor * a, 1.0);
+  }
+`;
+
+/** Лучи прожекторов с крыш (один InstancedMesh), медленно качаются. points: [{x, y, z, lean: [dx, dz]}] — куда наклонён луч. */
+export function makeSearchlights(points, { color = 0xd8d0ff, alpha = 0.22, length = 520 } = {}) {
+  const geo = new THREE.CylinderGeometry(26, 1.4, length, 16, 1, true);
+  geo.translate(0, length / 2, 0);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color) }, uAlpha: { value: alpha } },
+    vertexShader: beamVert,
+    fragmentShader: beamFrag,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const im = new THREE.InstancedMesh(geo, mat, Math.max(1, points.length));
+  im.count = points.length;
+  im.frustumCulled = false;
+  im.castShadow = false;
+  im.name = 'searchlights';
+  const e = new THREE.Euler(0, 0, 0, 'YZX');
+  const q = new THREE.Quaternion();
+  const m = new THREE.Matrix4();
+  const one = new THREE.Vector3(1, 1, 1);
+  const pos = points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
+  let t = 0;
+  const update = (dt) => {
+    t += dt;
+    points.forEach((p, i) => {
+      const ph = i * 2.1;
+      // наклон вокруг Z уводит ось к -X, поворот рыскания разворачивает его в сторону lean
+      const yaw = p.lean ? Math.atan2(p.lean[1], -p.lean[0]) : i * 1.7;
+      e.set(0, yaw + Math.sin(t * 0.21 + ph) * 0.7, 0.32 + Math.sin(t * 0.33 + ph * 1.3) * 0.14);
+      m.compose(pos[i], q.setFromEuler(e), one);
+      im.setMatrixAt(i, m);
+    });
+    im.instanceMatrix.needsUpdate = true;
+  };
+  update(0);
+  return { group: im, update };
+}
+
+// ------------------------------------------------------------------ дорожные мелочи: зебры, указатели, ворота, щиты
+/** Пешеходные переходы поперёк дороги на долях круга fs. */
+export function makeCrosswalks(track, fs) {
+  const c = canvas(256, 32);
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 256, 32);
+  g.fillStyle = 'rgba(240,236,255,0.92)';
+  for (let i = 0; i < 12; i++) g.fillRect(8 + i * 20.5, 0, 11, 32);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = toon(0xffffff, { map: tex, transparent: true, ramp: 'terrain' });
+  mat.depthWrite = false;
+  mat.polygonOffset = true;
+  mat.polygonOffsetFactor = -3;
+  mat.polygonOffsetUnits = -3;
+  const geos = [];
+  for (const f of fs) {
+    const i0 = Math.round((f * track.length) / track.spacing);
+    geos.push(
+      track.extrude(
+        [
+          { k: -1, c: 0.4, y: 0.015, u: 0 },
+          { k: 1, c: -0.4, y: 0.015, u: 1 },
+        ],
+        { from: i0, to: i0 + Math.max(2, Math.round(4.5 / track.spacing)), vScale: 1000 }
+      )
+    );
+  }
+  const m = new THREE.Mesh(merge(geos), mat);
+  m.receiveShadow = true;
+  m.renderOrder = 1;
+  m.name = 'crosswalks';
+  return m;
+}
+
+/** Портал-указатель над скоростной дорогой (синий щит с белым текстом). */
+export function highwayGantry(track, s, line1, line2, outline) {
+  const fr = track.frameAtProgress(s, {});
+  const half = fr.hw + fr.wall + 0.3;
+  const group = new THREE.Group();
+  const parts = [];
+  for (const k of [-1, 1]) parts.push(box(0.45, 8.2, 0.45, k * half, 4.1, 0));
+  parts.push(box(half * 2 + 0.6, 0.5, 0.5, 0, 7.9, 0));
+  parts.push(box(half * 2 + 0.6, 0.35, 0.35, 0, 6.2, 0.1));
+  for (const k of [-1, 1]) parts.push(box(10.2, 3.3, 0.2, k * half * 0.45, 7.0, -0.15));
+  const g = merge(parts);
+  const m = new THREE.Mesh(g, toon(0x5a5a78, { rim: 0.3 }));
+  m.castShadow = true;
+  group.add(m);
+  if (outline) m.add(new THREE.Mesh(outlineGeometry(g), outlineMaterial(0x141020, 0.05)));
+  const c = canvas(512, 160);
+  const x = c.getContext('2d');
+  x.fillStyle = '#1c4aa8';
+  x.fillRect(0, 0, 512, 160);
+  x.strokeStyle = '#ffffff';
+  x.lineWidth = 6;
+  x.strokeRect(8, 8, 496, 144);
+  x.fillStyle = '#ffffff';
+  x.textBaseline = 'middle';
+  x.font = `900 46px ${JP_FONT}`;
+  x.fillText('↑ ' + line1, 26, 52);
+  x.fillText('← ' + line2, 26, 112);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  // щиты смотрят навстречу гонщикам (локальная -Z)
+  const boards = [-1, 1].map((k) => new THREE.PlaneGeometry(10, 3.1).rotateY(Math.PI).translate(k * half * 0.45, 7.0, -0.3));
+  group.add(new THREE.Mesh(merge(boards), new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(1.05, 1.05, 1.05) })));
+  // локальная +Z = вперёд по трассе
+  group.position.copy(fr.pos);
+  group.rotation.y = Math.atan2(fr.tan.x, fr.tan.z);
+  group.name = 'gantry';
+  return group;
+}
+
+export function tileTexture() {
+  const c = canvas(128, 128);
+  const g = c.getContext('2d');
+  g.fillStyle = '#5c5674';
+  g.fillRect(0, 0, 128, 128);
+  const rnd = mulberry32(9);
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const v = 80 + Math.floor(rnd() * 20);
+      g.fillStyle = `rgb(${v},${v - 6},${v + 22})`;
+      g.fillRect(i * 32 + 2, j * 32 + 2, 28, 28);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+export function bannerTexture(big, small) {
+  const c = canvas(1024, 144);
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 1024, 0);
+  grd.addColorStop(0, '#1a0830');
+  grd.addColorStop(0.5, '#2a0c44');
+  grd.addColorStop(1, '#1a0830');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 1024, 144);
+  g.strokeStyle = '#35e8ff';
+  g.lineWidth = 6;
+  g.shadowColor = '#35e8ff';
+  g.shadowBlur = 16;
+  g.strokeRect(8, 8, 1008, 128);
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.shadowColor = '#ff3ad0';
+  g.shadowBlur = 26;
+  g.fillStyle = '#ff5ad8';
+  g.font = `900 92px ${JP_FONT}`;
+  g.fillText(big, 300, 76);
+  g.shadowBlur = 8;
+  g.fillStyle = '#ffe0f8';
+  g.fillText(big, 300, 76);
+  g.shadowColor = '#35e8ff';
+  g.shadowBlur = 14;
+  g.fillStyle = '#bff8ff';
+  const [l1, l2] = small;
+  g.font = `900 46px "Russo One", ${JP_FONT}`;
+  g.fillText(l1, 790, 52);
+  g.font = `900 34px ${JP_FONT}`;
+  g.fillText(l2, 790, 100);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** Ворота аллеи фонариков: два столба, балка и вывеска "ネオン横丁". */
+export function alleyGate(half, outline) {
+  const group = new THREE.Group();
+  const red = toon(0xc8283a, { rim: 0.3 });
+  const dark = toon(0x1c1420);
+  const parts = [];
+  for (const s of [-1, 1]) parts.push(new THREE.BoxGeometry(0.9, 11, 0.9).translate(s * half, 5.5, 0));
+  parts.push(new THREE.BoxGeometry(half * 2 + 3, 0.9, 1.1).translate(0, 11.2, 0));
+  parts.push(new THREE.BoxGeometry(half * 2 + 1, 0.5, 0.7).translate(0, 9.2, 0));
+  const g = merge(parts);
+  const m = new THREE.Mesh(g, red);
+  m.castShadow = true;
+  group.add(m);
+  const board = new THREE.Mesh(box(14, 2.4, 0.5, 0, 10.1, 0), dark);
+  group.add(board);
+  if (outline) m.add(new THREE.Mesh(outlineGeometry(merge([g, board.geometry])), outlineMaterial(0x2a0a14, 0.06)));
+  const c = canvas(512, 96);
+  const x = c.getContext('2d');
+  x.fillStyle = '#1a0a14';
+  x.fillRect(0, 0, 512, 96);
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.font = `900 64px ${JP_FONT}`;
+  x.shadowColor = '#ffb040';
+  x.shadowBlur = 20;
+  x.fillStyle = '#ffd070';
+  x.fillText('ネオン横丁', 256, 52);
+  x.shadowBlur = 0;
+  x.fillStyle = '#fff4d8';
+  x.fillText('ネオン横丁', 256, 52);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  const sm = new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(1.7, 1.7, 1.7) });
+  const plates = [new THREE.PlaneGeometry(13.4, 2.1).translate(0, 10.1, 0.27), new THREE.PlaneGeometry(13.4, 2.1).rotateY(Math.PI).translate(0, 10.1, -0.27)];
+  group.add(new THREE.Mesh(merge(plates), sm));
+  group.name = 'alley-gate';
+  return group;
+}
+
+/** Неоновые шевроны на внешней стороне поворотов (бегущие стрелки). Возвращает {group, update}. */
+export function makeChevronBoards(track, { minCurv = 0.016, step = 10, colorA = '#ffe14a', colorB = '#ff3ad0' } = {}) {
+  const c = canvas(256, 128);
+  const g = c.getContext('2d');
+  g.fillStyle = '#120a22';
+  g.fillRect(0, 0, 256, 128);
+  g.lineJoin = 'round';
+  for (let i = 0; i < 2; i++) {
+    const x0 = 40 + i * 128;
+    g.shadowColor = colorB;
+    g.shadowBlur = 14;
+    g.strokeStyle = i ? colorB : colorA;
+    g.lineWidth = 22;
+    g.beginPath();
+    g.moveTo(x0, 24);
+    g.lineTo(x0 + 44, 64);
+    g.lineTo(x0, 104);
+    g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.repeat.set(1.5, 1);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1.5, 1.5, 1.5), side: THREE.DoubleSide });
+  const mats = [];
+  const fr = {};
+  const up = new THREE.Vector3(0, 1, 0);
+  for (let s = 0; s < track.length; s += step) {
+    track.frameAtProgress(s, fr);
+    if (Math.abs(fr.curv) < minCurv) continue;
+    const side = Math.sign(fr.curv); // внешняя сторона поворота
+    const lat = side * (fr.hw + fr.wall + 0.35);
+    const p = fr.pos.clone().addScaledVector(fr.right, lat);
+    p.y += 1.75;
+    const ry = Math.atan2(-fr.tan.x, -fr.tan.z);
+    // стрелки указывают внутрь поворота; для левых поворотов — зеркально
+    mats.push(new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromAxisAngle(up, ry), new THREE.Vector3(side < 0 ? 3.2 : -3.2, 1.6, 1)));
+  }
+  const group = new THREE.Group();
+  group.name = 'chevrons';
+  const board = new THREE.PlaneGeometry(1, 1);
+  const im = new THREE.InstancedMesh(board, mat, Math.max(1, mats.length));
+  mats.forEach((m, i) => im.setMatrixAt(i, m));
+  im.count = mats.length;
+  im.computeBoundingSphere();
+  group.add(im);
+  const back = new THREE.BoxGeometry(1.08, 1.12, 0.12).translate(0, 0, -0.08);
+  const bm = new THREE.InstancedMesh(back, toon(0x1a1428), Math.max(1, mats.length));
+  mats.forEach((m, i) => bm.setMatrixAt(i, m));
+  bm.count = mats.length;
+  bm.computeBoundingSphere();
+  group.add(bm);
+  const update = (dt) => {
+    tex.offset.x -= dt * 0.9;
+  };
+  return { group, update };
+}
+
+/** Дирижабль с экраном, медленно облетающий город. Возвращает {group, update}. */
+export function makeBlimp({ center = new THREE.Vector3(), radius = 360, height = 115, speed = 0.008, start = 0, outline = true } = {}) {
+  const group = new THREE.Group();
+  group.name = 'blimp';
+  const body = new THREE.SphereGeometry(1, 24, 14);
+  body.scale(26, 7.5, 7.5);
+  // хвостовое оперение и гондола
+  const parts = [body, box(6, 0.4, 17, -21, 0, 0), box(6, 17, 0.4, -21, 0, 0)];
+  parts.push(box(7, 2, 2.6, 2, -8, 0));
+  const g = merge(parts);
+  const mesh = new THREE.Mesh(g, toon(0xd8d0f0, { rim: 0.4, rimColor: 0xff8ad8 }));
+  group.add(mesh);
+  if (outline) mesh.add(new THREE.Mesh(outlineGeometry(g), outlineMaterial(0x1a1030, 0.12)));
+  // экраны на боках
+  for (const s of [-1, 1]) {
+    const scr = makeHoloScreen(24, 6.5, { mode: 0, text: 'SAKURA DRIFT ♥ ネオン東京 ♥', a: 0xff3ad0, b: 0x6a2cff, c: 0x35e8ff, bright: 1.05 });
+    scr.position.set(1, 0.5, s * 7.35);
+    if (s < 0) scr.rotation.y = Math.PI;
+    group.add(scr);
+    group.userData[s < 0 ? 'screenA' : 'screenB'] = scr;
+  }
+  const lamps = [new THREE.SphereGeometry(0.55, 8, 6).translate(26.2, 0, 0), new THREE.SphereGeometry(0.4, 8, 6).translate(-26.5, 0, 0)];
+  group.add(new THREE.Mesh(merge(lamps), glow(0xff3a4a, 3)));
+  let a = start;
+  const update = (dt) => {
+    a += dt * speed;
+    group.position.set(center.x + Math.cos(a) * radius, height + Math.sin(a * 3) * 4, center.z + Math.sin(a) * radius);
+    // нос (+X) по касательной к окружности
+    group.rotation.y = -a - Math.PI / 2;
+    group.userData.screenA.userData.update(dt);
+    group.userData.screenB.userData.update(dt);
   };
   update(0);
   return { group, update };
