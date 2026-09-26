@@ -492,6 +492,92 @@ function drumHand(S, out, t, vel, f, decay, slap) {
   releaseOnEnd(n, [n, bp, ng]);
 }
 
+/** Рок-бочка: плотный короткий удар — быстрый спуск высоты, «тук» пластика и щелчок колотушки. */
+function drumRockKick(S, out, t, vel) {
+  const ctx = S.ctx;
+  const o = osc(ctx, 'sine', 160, t);
+  o.frequency.exponentialRampToValueAtTime(62, t + 0.028);
+  o.frequency.exponentialRampToValueAtTime(47, t + 0.3);
+  const g = gainNode(ctx, 0);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vel, t + 0.002);
+  g.gain.setTargetAtTime(0, t + 0.035, 0.065);
+  o.connect(g).connect(out);
+  o.start(t);
+  o.stop(t + 0.4);
+  releaseOnEnd(o, [o, g]);
+  const k = osc(ctx, 'triangle', 480, t);
+  k.frequency.exponentialRampToValueAtTime(170, t + 0.018);
+  const kg = gainNode(ctx, 0);
+  kg.gain.setValueAtTime(vel * 0.32, t);
+  kg.gain.setTargetAtTime(0, t, 0.009);
+  k.connect(kg).connect(out);
+  k.start(t);
+  k.stop(t + 0.07);
+  releaseOnEnd(k, [k, kg]);
+  const n = noiseSrc(S, t, 0.03);
+  const bp = biquad(ctx, 'bandpass', 3400, 1.1);
+  const ng = gainNode(ctx, 0);
+  ng.gain.setValueAtTime(vel * 0.55, t);
+  ng.gain.setTargetAtTime(0, t, 0.0035);
+  n.connect(bp).connect(ng).connect(out);
+  releaseOnEnd(n, [n, bp, ng]);
+}
+
+/** Рок-малый: низкий плотный тон, второй мод пластика и долгий яркий шум пружин. */
+function drumRockSnare(S, out, t, vel) {
+  const ctx = S.ctx;
+  for (const [f0, f1, a, d] of [[205, 172, 0.62, 0.05], [335, 300, 0.26, 0.03]]) {
+    const o = osc(ctx, 'triangle', f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + 0.05);
+    const og = gainNode(ctx, 0);
+    og.gain.setValueAtTime(vel * a, t);
+    og.gain.setTargetAtTime(0, t + 0.004, d);
+    o.connect(og).connect(out);
+    o.start(t);
+    o.stop(t + 0.3);
+    releaseOnEnd(o, [o, og]);
+  }
+  const n = noiseSrc(S, t, 0.45);
+  const hp = biquad(ctx, 'highpass', 750, 0.7);
+  const pk = biquad(ctx, 'peaking', 2700, 0.9);
+  pk.gain.value = 5;
+  const ng = gainNode(ctx, 0);
+  ng.gain.setValueAtTime(vel * 0.55, t);
+  ng.gain.setTargetAtTime(vel * 0.28, t + 0.004, 0.018);
+  ng.gain.setTargetAtTime(0, t + 0.03, 0.1);
+  n.connect(hp).connect(pk).connect(ng).connect(out);
+  releaseOnEnd(n, [n, hp, pk, ng]);
+}
+
+// Райд: негармоничные призвуки [частота, амплитуда, спад (с)] — «пинг» палочки над шипящим звоном
+const RIDE_P = [[2960, 0.5, 0.42], [4180, 0.42, 0.34], [5310, 0.33, 0.28], [6870, 0.26, 0.22], [8450, 0.2, 0.18]];
+
+/** Тарелка райд: звонкий «пинг» и мягкое шипение, короче и суше крэша. */
+function drumRide(S, out, t, vel) {
+  const ctx = S.ctx;
+  for (const [f, a, d] of RIDE_P) {
+    const o = osc(ctx, 'sine', f, t);
+    const g = gainNode(ctx, 0);
+    g.gain.setValueAtTime(vel * a * 0.22, t);
+    g.gain.setTargetAtTime(0, t, d);
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + d * 5);
+    releaseOnEnd(o, [o, g]);
+  }
+  const n = noiseSrc(S, t, 1.2);
+  const hp = biquad(ctx, 'highpass', 5200, 0.7);
+  const pk = biquad(ctx, 'peaking', 9000, 1);
+  pk.gain.value = 4;
+  const ng = gainNode(ctx, 0);
+  ng.gain.setValueAtTime(vel * 0.3, t);
+  ng.gain.setTargetAtTime(vel * 0.1, t + 0.002, 0.012);
+  ng.gain.setTargetAtTime(0, t + 0.03, 0.28);
+  n.connect(hp).connect(pk).connect(ng).connect(out);
+  releaseOnEnd(n, [n, hp, pk, ng]);
+}
+
 /** One-shot AudioBuffer playback (pre-rendered drums). */
 function playBuffer(ctx, buf, out, t, vel, rate) {
   const s = ctx.createBufferSource();
@@ -527,9 +613,13 @@ const DRUM_KIT = [
   ['gsnare', 0.32, drumGatedSnare],
   ['conga', 0.66, (S, o, t, v) => drumHand(S, o, t, v, 262, 0.12, 1500)],
   ['bongo', 0.36, (S, o, t, v) => drumHand(S, o, t, v, 523, 0.065, 2600)],
+  // рок-установка «Кленового Перевала» (kickKind / snareKind, партия ride)
+  ['rkick', 0.4, drumRockKick],
+  ['rsnare', 0.5, drumRockSnare],
+  ['ride', 1.3, drumRide],
 ];
 // Перкуссия, которую темы пишут отдельными партиями (см. PERC_HIT)
-const PERC = ['taiko', 'ka', 'clack', 'kane', 'conga', 'bongo'];
+const PERC = ['taiko', 'ka', 'clack', 'kane', 'conga', 'bongo', 'ride'];
 
 /**
  * Renders every drum voice once into AudioBuffers (OfflineAudioContext) so the
@@ -858,8 +948,17 @@ function synthLead(S, out, t, dur, midi, vel, o, glideFrom) {
 
 // ---------------------------------------------------------------------------
 // Тоны, синтезированные в JS прямо в AudioBuffer (по разу на ноту, кэш в S.tones):
-// щипковые струны по Карплусу–Стронгу и стил-пэн. Нота потом стоит 2 узла.
+// щипковые струны по Карплусу–Стронгу, стил-пэн и перегруженные электрогитары. Нота потом
+// стоит 2 узла. Синтез — генераторы, уступающие управление после каждого куска (не длиннее
+// CHUNK отсчётов): плеер греет тоны темы кусками, не дольше WARM_MS за тик, в порядке первого
+// звучания, и главный поток не замирает на десятки миллисекунд, когда тема стартует.
 // ---------------------------------------------------------------------------
+
+const CHUNK = 4096; // генераторы синтеза уступают управление не реже чем через CHUNK отсчётов
+const WARM_MS = 3; // бюджет прогрева тонов за тик планировщика, мс
+const HOLD_MAX = 0.6; // сколько тема может ждать тоны первого такта, с
+const HOLD_STEPS = 4; // шаги начала темы, чьи тоны должны быть готовы до старта
+const clock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
 // secs — длина буфера, t60 — затухание (с), damp — фильтр петли (0..0.5, больше — глуше),
 // tone — яркость щипка (0..1), pos — точка щипка (доля струны), buzz — порог «савари»
@@ -870,12 +969,47 @@ const STRINGS = {
   uke: { secs: 0.9, t60: 0.8, damp: 0.45, tone: 0.3, pos: 0.22, buzz: 0, click: 0.03 },
 };
 
-/** Струна по Карплусу–Стронгу: шумовой щипок бежит по дробной линии задержки с фильтром потерь. */
-function makeString(ctx, f, o) {
-  const rate = ctx.sampleRate;
-  const n = Math.floor(rate * o.secs);
-  const buf = ctx.createBuffer(1, n, rate);
-  const d = buf.getChannelData(0);
+// Синтез тонов разбит на «ядра» — обычные функции над отрезком [from, to) массива (их циклы V8
+// оптимизирует; состояние между кусками — в Float64Array), и тонкие генераторы, которые вызывают
+// ядра кусками по CHUNK отсчётов и уступают управление между ними.
+
+// Длина куска подстраивается под скорость: пока ядро не оптимизировано (первые вызовы) или процессор
+// медленный, кусок короче, чтобы один кусок не занимал больше ~0.3 мс.
+let chunkLen = 256;
+
+/** Вызывает fn(from, to) кусками из n отсчётов, уступая управление после каждого. Генератор. */
+function* chunks(n, fn) {
+  for (let i = 0; i < n; ) {
+    const j = Math.min(n, i + chunkLen);
+    const t = clock();
+    fn(i, j);
+    const dt = clock() - t;
+    if (dt > 0.3 && chunkLen > 64) chunkLen >>= 1;
+    else if (dt < 0.1 && chunkLen < CHUNK) chunkLen <<= 1;
+    i = j;
+    yield;
+  }
+}
+
+/** Петля струны Карплуса–Стронга на [from, to): состояние — сам массив d (уже посчитанные отсчёты). */
+function ksRun(d, from, to, Di, fr, loss, damp, buzz, exc, E, ep) {
+  for (let i = from; i < to; i++) {
+    const j = i - Di;
+    const a = j >= 0 ? d[j] : 0;
+    const b = j >= 1 ? d[j - 1] : 0;
+    const c = j >= 2 ? d[j - 2] : 0;
+    const x0 = a + fr * (b - a);
+    let v = loss * (x0 + damp * (b + fr * (c - b) - x0));
+    if (buzz && v < -buzz) v = -buzz + (v + buzz) * 0.25;
+    d[i] = i < E ? v + exc[i] / ep : v;
+  }
+}
+
+/**
+ * Струна по Карплусу–Стронгу в массив d: шумовой щипок бежит по дробной линии задержки
+ * с фильтром потерь. o: { t60, damp, tone, pos, buzz } (см. STRINGS). Генератор.
+ */
+function* pluck(d, rate, f, o) {
   const P = rate / f;
   const D = P - o.damp; // двухотводный фильтр петли добавляет damp отсчётов задержки
   const Di = Math.floor(D);
@@ -893,31 +1027,274 @@ function makeString(ctx, f, o) {
   for (let i = E - 1; i >= pd; i--) exc[i] -= exc[i - pd];
   let ep = 1e-9;
   for (let i = 0; i < E; i++) ep = Math.max(ep, Math.abs(exc[i]));
-  for (let i = 0; i < n; i++) {
-    const j = i - Di;
-    const a = j >= 0 ? d[j] : 0;
-    const b = j >= 1 ? d[j - 1] : 0;
-    const c = j >= 2 ? d[j - 2] : 0;
-    const x0 = a + fr * (b - a);
-    let v = loss * (x0 + o.damp * (b + fr * (c - b) - x0));
-    if (o.buzz && v < -o.buzz) v = -o.buzz + (v + o.buzz) * 0.25;
-    d[i] = i < E ? v + exc[i] / ep : v;
-  }
-  // щелчок атаки, срез постоянной составляющей, нормировка и затухающий край
-  let prev = 0;
-  let y = 0;
-  let peak = 1e-9;
-  const clickLen = Math.floor(rate * 0.02);
-  for (let i = 0; i < n; i++) {
+  const buzz = o.buzz || 0;
+  yield* chunks(d.length, (a, b) => ksRun(d, a, b, Di, fr, loss, o.damp, buzz, exc, E, ep));
+}
+
+/** Щелчок атаки (первые clickLen отсчётов), срез постоянной составляющей и пик на [from, to); st = [prev, y, peak]. */
+function strPost(d, from, to, st, rate, click, clickLen) {
+  let prev = st[0];
+  let y = st[1];
+  let peak = st[2];
+  for (let i = from; i < to; i++) {
     let x = d[i];
-    if (i < clickLen) x += o.click * (Math.random() * 2 - 1) * Math.exp(-i / (rate * 0.003));
+    if (i < clickLen) x += click * (Math.random() * 2 - 1) * Math.exp(-i / (rate * 0.003));
     y = x - prev + 0.995 * y;
     prev = x;
     d[i] = y;
     if (Math.abs(y) > peak) peak = Math.abs(y);
   }
+  st[0] = prev;
+  st[1] = y;
+  st[2] = peak;
+}
+
+/** Нормировка (g = 0.9 / пик) с затухающим краем в fade отсчётов на [from, to). */
+function normRun(d, from, to, g, n, fade) {
+  for (let i = from; i < to; i++) d[i] *= g * (i > n - fade ? (n - i) / fade : 1);
+}
+
+/** Струна (кото, сямисэн, укулеле) в буфер: щипок, щелчок атаки, нормировка. Генератор, вернёт AudioBuffer. */
+function* stringGen(ctx, f, o) {
+  const rate = ctx.sampleRate;
+  const n = Math.floor(rate * o.secs);
+  const buf = ctx.createBuffer(1, n, rate);
+  const d = buf.getChannelData(0);
+  yield* pluck(d, rate, f, o);
+  // щелчок атаки, срез постоянной составляющей, нормировка и затухающий край
+  const st = new Float64Array([0, 0, 1e-9]);
+  const clickLen = Math.floor(rate * 0.02);
+  yield* chunks(n, (a, b) => strPost(d, a, b, st, rate, o.click, clickLen));
+  const g = 0.9 / st[2];
   const fade = Math.floor(rate * 0.03);
-  for (let i = 0; i < n; i++) d[i] *= (0.9 / peak) * (i > n - fade ? (n - i) / fade : 1);
+  yield* chunks(n, (a, b) => normRun(d, a, b, g, n, fade));
+  return buf;
+}
+
+// Перегруженные электрогитары и бас-гитара. Струны по Карплусу–Стронгу (t60, damp, tone, pos — как
+// в STRINGS) → предусилитель: ФВЧ pre (Гц), усиление drive, мягкое насыщение sat (≈ tanh) со
+// смещением bias (чётные гармоники) при двукратной передискретизации → «кабинет»: ФВЧ hp, горб
+// середины mid / midDb, крутой ФНЧ lp; mid2 / mid2Db — второй эквалайзер (провал, чтобы ритм-гитары
+// не закрывали соло). iv — струны (полутоны от ноты: квинтаккорд 0, 7, 12), strum — разнос струн
+// при ударе (с), takes: 2 — два разных дубля (свой шум щипка, строй ±spread центов) в левом и правом
+// канале, env — спад после перегруза (с; глушение ладонью), sub — синус основного тона (бас).
+// Буфер — на половинной частоте дискретизации: выше 5 кГц кабинет всё равно ничего не пропускает.
+const AMPS = {
+  gtr: { secs: 0.8, iv: [0, 7, 12], mix: [1, 0.85, 0.6], takes: 2, strum: 0.011, spread: 5, t60: 3, damp: 0.16, tone: 0.8, pos: 0.13, pre: 180, drive: 14, bias: 0.25, hp: 90, mid: 600, midDb: 2, mid2: 1500, mid2Db: -5, lp: 4600 },
+  gmute: { secs: 0.34, iv: [0, 7, 12], mix: [1, 0.8, 0.5], takes: 2, strum: 0.004, spread: 5, t60: 0.14, damp: 0.38, tone: 0.55, pos: 0.13, pre: 110, drive: 10, bias: 0.25, env: 0.07, hp: 90, mid: 850, midDb: 3, lp: 2800 },
+  glead: { secs: 1.8, iv: [0], takes: 1, spread: 0, t60: 5, damp: 0.1, tone: 0.9, pos: 0.1, pre: 350, drive: 24, bias: 0.2, hp: 110, mid: 1500, midDb: 6, lp: 5000 },
+  griff: { secs: 0.7, iv: [0], takes: 1, spread: 0, t60: 1.2, damp: 0.16, tone: 0.8, pos: 0.12, pre: 200, drive: 12, bias: 0.25, hp: 90, mid: 1200, midDb: 4, lp: 4200 },
+  gbass: { secs: 0.9, iv: [0], takes: 1, spread: 0, t60: 1.6, damp: 0.3, tone: 0.45, pos: 0.2, pre: 0, drive: 1.6, bias: 0.1, sub: 0.25, hp: 38, mid: 750, midDb: 3, lp: 2300 },
+};
+
+/** Коэффициенты биквада (RBJ) [b0, b1, b2, a1, a2]: type 'lp' | 'hp' | 'peak'. */
+function bqCoefs(type, f, q, db, rate) {
+  const w = (2 * Math.PI * f) / rate;
+  const cw = Math.cos(w);
+  const al = Math.sin(w) / (2 * q);
+  const A = Math.pow(10, db / 40);
+  let b0, b1, b2, a1, a2, a0;
+  if (type === 'lp') {
+    b1 = 1 - cw;
+    b0 = b2 = b1 / 2;
+  } else if (type === 'hp') {
+    b1 = -(1 + cw);
+    b0 = b2 = (1 + cw) / 2;
+  }
+  if (type === 'peak') {
+    b0 = 1 + al * A;
+    b1 = -2 * cw;
+    b2 = 1 - al * A;
+    a0 = 1 + al / A;
+    a2 = 1 - al / A;
+  } else {
+    a0 = 1 + al;
+    a2 = 1 - al;
+  }
+  a1 = -2 * cw;
+  return [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0];
+}
+
+/** Биквад c = [b0, b1, b2, a1, a2] на месте на [from, to); st = [x1, x2, y1, y2]. */
+function bqRun(d, from, to, c, st) {
+  const b0 = c[0];
+  const b1 = c[1];
+  const b2 = c[2];
+  const a1 = c[3];
+  const a2 = c[4];
+  let x1 = st[0];
+  let x2 = st[1];
+  let y1 = st[2];
+  let y2 = st[3];
+  for (let i = from; i < to; i++) {
+    const x = d[i];
+    const y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1;
+    x1 = x;
+    y2 = y1;
+    y1 = y;
+    d[i] = y;
+  }
+  st[0] = x1;
+  st[1] = x2;
+  st[2] = y1;
+  st[3] = y2;
+}
+
+/** Мягкое насыщение: рациональное приближение tanh, гладко (с нулевой производной) выходит на ±1 при |x| = 3. */
+const sat = (x) => (x <= -3 ? -1 : x >= 3 ? 1 : (x * (27 + x * x)) / (27 + 9 * x * x));
+
+/**
+ * Предусилитель и перегруз на [from, to): ФВЧ первого порядка ka, усиление drive, насыщение со
+ * смещением bias на удвоенной частоте (промежуточный отсчёт — линейная интерполяция), ФНЧ
+ * Баттерворта 4-го порядка aa (два биквада подряд) и прореживание; после hold отсчётов — спад ke.
+ * st — состояние (12 чисел: ФВЧ, интерполятор, огибающая, два биквада).
+ */
+function ampRun(d, from, to, st, ka, drive, bias, aa, ke, hold) {
+  const tb = sat(bias);
+  const p0 = aa[0];
+  const p1 = aa[1];
+  const p2 = aa[2];
+  const pa1 = aa[3];
+  const pa2 = aa[4];
+  const q0 = aa[5];
+  const q1 = aa[6];
+  const q2 = aa[7];
+  const qa1 = aa[8];
+  const qa2 = aa[9];
+  let hx = st[0];
+  let hy = st[1];
+  let pu = st[2];
+  let e = st[3];
+  let px1 = st[4];
+  let px2 = st[5];
+  let py1 = st[6];
+  let py2 = st[7];
+  let qx1 = st[8];
+  let qx2 = st[9];
+  let qy1 = st[10];
+  let qy2 = st[11];
+  for (let i = from; i < to; i++) {
+    const x = d[i];
+    hy = ka ? ka * (hy + x - hx) : x;
+    hx = x;
+    const u = hy * drive;
+    const vm = sat(0.5 * (u + pu) + bias) - tb;
+    const vc = sat(u + bias) - tb;
+    pu = u;
+    let y = p0 * vm + p1 * px1 + p2 * px2 - pa1 * py1 - pa2 * py2;
+    px2 = px1;
+    px1 = vm;
+    py2 = py1;
+    py1 = y;
+    let z = q0 * y + q1 * qx1 + q2 * qx2 - qa1 * qy1 - qa2 * qy2;
+    qx2 = qx1;
+    qx1 = y;
+    qy2 = qy1;
+    qy1 = z;
+    y = p0 * vc + p1 * px1 + p2 * px2 - pa1 * py1 - pa2 * py2;
+    px2 = px1;
+    px1 = vc;
+    py2 = py1;
+    py1 = y;
+    z = q0 * y + q1 * qx1 + q2 * qx2 - qa1 * qy1 - qa2 * qy2;
+    qx2 = qx1;
+    qx1 = y;
+    qy2 = qy1;
+    qy1 = z;
+    if (i >= hold) e *= ke;
+    d[i] = z * e; // прореживание: остаётся каждый второй отсчёт
+  }
+  st[0] = hx;
+  st[1] = hy;
+  st[2] = pu;
+  st[3] = e;
+  st[4] = px1;
+  st[5] = px2;
+  st[6] = py1;
+  st[7] = py2;
+  st[8] = qx1;
+  st[9] = qx2;
+  st[10] = qy1;
+  st[11] = qy2;
+}
+
+/** Струна str со сдвигом at и громкостью g — в сумму d на [from, to). */
+function addRun(d, from, to, str, at, g) {
+  for (let i = Math.max(from, at); i < to; i++) d[i] += g * str[i - at];
+}
+
+/** Основной тон синусом (поворот фазора) с атакой atk отсчётов и спадом kd — в сумму d на [from, to); st = [x, y, амплитуда]. */
+function subRun(d, from, to, st, cw, sw, kd, atk) {
+  let x = st[0];
+  let y = st[1];
+  let a = st[2];
+  for (let i = from; i < to; i++) {
+    const nx = x * cw + y * sw;
+    y = y * cw - x * sw;
+    x = nx;
+    d[i] += x * a * (i < atk ? i / atk : 1);
+    a *= kd;
+  }
+  st[0] = x;
+  st[1] = y;
+  st[2] = a;
+}
+
+/** Пик |d| на [from, to) с учётом уже найденного st[0]. */
+function peakRun(d, from, to, st) {
+  let peak = st[0];
+  for (let i = from; i < to; i++) if (Math.abs(d[i]) > peak) peak = Math.abs(d[i]);
+  st[0] = peak;
+}
+
+/** Электрогитара / бас-гитара (параметры AMPS) для ноты midi. Генератор, вернёт AudioBuffer (дубли — каналы). */
+function* ampGen(ctx, midi, o) {
+  const rate = Math.max(22050, ctx.sampleRate / 2); // старый Safari не создаёт буферы ниже 22050 Гц
+  const n = Math.floor(rate * o.secs);
+  const buf = ctx.createBuffer(o.takes, n, rate);
+  const str = new Float32Array(n);
+  // ФНЧ Баттерворта 4-го порядка на удвоенной частоте: всё выше 0.45·rate убрать до прореживания
+  const aa = new Float64Array(bqCoefs('lp', 0.45 * rate, 0.541, 0, 2 * rate).concat(bqCoefs('lp', 0.45 * rate, 1.307, 0, 2 * rate)));
+  const cab = [bqCoefs('hp', o.hp, 0.707, 0, rate), bqCoefs('peak', o.mid, 0.9, o.midDb, rate), bqCoefs('lp', o.lp, 0.541, 0, rate), bqCoefs('lp', o.lp, 1.307, 0, rate)];
+  if (o.mid2) cab.push(bqCoefs('peak', o.mid2, 0.9, o.mid2Db, rate));
+  const ka = o.pre ? Math.exp((-2 * Math.PI * o.pre) / rate) : 0;
+  const ke = o.env ? Math.exp(-1 / (rate * o.env)) : 1;
+  const hold = Math.floor(rate * 0.015);
+  const pk = new Float64Array([1e-9]);
+  for (let c = 0; c < o.takes; c++) {
+    const d = buf.getChannelData(c);
+    for (let k = 0; k < o.iv.length; k++) {
+      str.fill(0);
+      const det = Math.pow(2, ((Math.random() * 2 - 1) * o.spread) / 1200);
+      yield* pluck(str, rate, mtof(midi + o.iv[k]) * det, o);
+      // удар по струнам сверху вниз: каждая следующая чуть позже
+      const at = k ? Math.floor(rate * o.strum * k * (0.7 + 0.6 * Math.random())) : 0;
+      const g = o.mix ? o.mix[k] : 1;
+      yield* chunks(n, (a, b) => addRun(d, a, b, str, at, g));
+    }
+    if (o.sub) {
+      const w = (2 * Math.PI * mtof(midi)) / rate;
+      const kd = Math.exp(-1 / (rate * o.t60 * 0.35));
+      const atk = Math.floor(rate * 0.004);
+      const s = new Float64Array([0, 1, o.sub]);
+      yield* chunks(n, (a, b) => subRun(d, a, b, s, Math.cos(w), Math.sin(w), kd, atk));
+    }
+    const st = new Float64Array(12);
+    st[3] = 1;
+    yield* chunks(n, (a, b) => ampRun(d, a, b, st, ka, o.drive, o.bias, aa, ke, hold));
+    for (const cc of cab) {
+      const s = new Float64Array(4);
+      yield* chunks(n, (a, b) => bqRun(d, a, b, cc, s));
+    }
+    yield* chunks(n, (a, b) => peakRun(d, a, b, pk));
+  }
+  const g = 0.9 / pk[0];
+  const fade = Math.floor(rate * 0.03);
+  for (let c = 0; c < o.takes; c++) {
+    const d = buf.getChannelData(c);
+    yield* chunks(n, (a, b) => normRun(d, a, b, g, n, fade));
+  }
   return buf;
 }
 
@@ -932,8 +1309,42 @@ const PAN_P = [
   [5.43, 0.04, 0.035, 0],
 ];
 
-/** Нота стил-пэна: сумма затухающих синусов (поворот фазора) + мягкий удар резиновой палочки. */
-function makePan(ctx, f) {
+/** Затухающий призвук стил-пэна (поворот фазора, «расцвет» kb) на [from, to); st = [x, y, e, b]. */
+function panRun(d, from, to, st, cw, sw, kd, kb) {
+  let x = st[0];
+  let y = st[1];
+  let e = st[2];
+  let b = st[3];
+  for (let i = from; i < to; i++) {
+    const nx = x * cw + y * sw;
+    y = y * cw - x * sw;
+    x = nx;
+    e *= kd;
+    b *= kb;
+    d[i] += x * e * (1 - b);
+  }
+  st[0] = x;
+  st[1] = y;
+  st[2] = e;
+  st[3] = b;
+}
+
+/** Удар резиновой палочки (шум через ФНЧ), атака atk отсчётов и пик на [from, to); st = [lp, peak]. */
+function panPost(d, from, to, st, rate, atk) {
+  let lp = st[0];
+  let peak = st[1];
+  for (let i = from; i < to; i++) {
+    lp += 0.15 * (Math.random() * 2 - 1 - lp);
+    const v = d[i] * (i < atk ? i / atk : 1) + lp * 0.5 * Math.exp(-i / (rate * 0.005));
+    d[i] = v;
+    if (Math.abs(v) > peak) peak = Math.abs(v);
+  }
+  st[0] = lp;
+  st[1] = peak;
+}
+
+/** Нота стил-пэна: сумма затухающих синусов (поворот фазора) + мягкий удар резиновой палочки. Генератор. */
+function* panGen(ctx, f) {
   const rate = ctx.sampleRate;
   const n = Math.floor(rate * 1.3);
   const buf = ctx.createBuffer(1, n, rate);
@@ -946,43 +1357,61 @@ function makePan(ctx, f) {
     const sw = Math.sin(w);
     const kd = Math.exp(-1 / (rate * dec * k));
     const kb = bloom ? Math.exp(-1 / (rate * bloom)) : 0;
-    let x = 0;
-    let y = 1;
-    let e = amp;
-    let b = 1;
-    for (let i = 0; i < n; i++) {
-      const nx = x * cw + y * sw;
-      y = y * cw - x * sw;
-      x = nx;
-      e *= kd;
-      b *= kb;
-      d[i] += x * e * (1 - b);
-    }
+    const st = new Float64Array([0, 1, amp, 1]);
+    yield* chunks(n, (a, b) => panRun(d, a, b, st, cw, sw, kd, kb));
   }
+  const st = new Float64Array([0, 1e-9]);
   const atk = Math.floor(rate * 0.0015);
-  let lp = 0;
-  let peak = 1e-9;
-  for (let i = 0; i < n; i++) {
-    lp += 0.15 * (Math.random() * 2 - 1 - lp);
-    const v = d[i] * (i < atk ? i / atk : 1) + lp * 0.5 * Math.exp(-i / (rate * 0.005));
-    d[i] = v;
-    if (Math.abs(v) > peak) peak = Math.abs(v);
-  }
+  yield* chunks(n, (a, b) => panPost(d, a, b, st, rate, atk));
+  const g = 0.9 / st[1];
   const fade = Math.floor(rate * 0.05);
-  for (let i = 0; i < n; i++) d[i] *= (0.9 / peak) * (i > n - fade ? (n - i) / fade : 1);
+  yield* chunks(n, (a, b) => normRun(d, a, b, g, n, fade));
   return buf;
 }
 
-/** Буфер тона kind ('koto' | 'shamisen' | 'uke' | 'pan') для ноты midi — синтезируется при первом запросе. */
-function toneBuffer(S, kind, midi) {
-  const cache = S.tones || (S.tones = new Map());
+/** Есть ли у инструмента kind буферы тонов (кото, сямисэн, укулеле, стил-пэн, гитары). */
+const isTone = (kind) => kind === 'pan' || !!STRINGS[kind] || !!AMPS[kind];
+
+/**
+ * Синтезирует (или дорабатывает начатый) тон kind для ноты midi до момента deadline
+ * (clock(), мс): true — буфер готов и лежит в S.tones, false — время вышло, продолжим позже.
+ */
+function warmTone(S, kind, midi, deadline) {
   const key = kind + midi;
-  let b = cache.get(key);
-  if (!b) {
-    b = kind === 'pan' ? makePan(S.ctx, mtof(midi)) : makeString(S.ctx, mtof(midi), STRINGS[kind]);
-    cache.set(key, b);
+  if (S.tones.has(key)) return true;
+  let job = S.jobs.get(key);
+  if (!job) {
+    const f = mtof(midi);
+    job = kind === 'pan' ? panGen(S.ctx, f) : AMPS[kind] ? ampGen(S.ctx, midi, AMPS[kind]) : stringGen(S.ctx, f, STRINGS[kind]);
+    S.jobs.set(key, job);
   }
-  return b;
+  for (;;) {
+    const r = job.next();
+    if (r.done) {
+      S.tones.set(key, r.value);
+      S.jobs.delete(key);
+      S.pending.delete(key);
+      return true;
+    }
+    if (clock() >= deadline) return false;
+  }
+}
+
+/**
+ * Буфер тона kind для ноты midi. Тон из очереди прогрева, который ещё не готов, — null: нота
+ * пропускается (счётчик S.missed), чтобы не синтезировать его целиком посреди тика. Тон вне
+ * очереди синтезируется сразу.
+ */
+function toneBuffer(S, kind, midi) {
+  const key = kind + midi;
+  const b = S.tones.get(key);
+  if (b) return b;
+  if (S.pending.has(key)) {
+    S.missed++;
+    return null;
+  }
+  warmTone(S, kind, midi, Infinity);
+  return S.tones.get(key);
 }
 
 /**
@@ -990,9 +1419,11 @@ function toneBuffer(S, kind, midi) {
  * dur > 0 — приглушить через dur секунд, иначе звучит до конца буфера.
  */
 function playTone(S, out, t, kind, midi, vel, dur, bend) {
+  const buf = toneBuffer(S, kind, midi);
+  if (!buf) return;
   const ctx = S.ctx;
   const s = ctx.createBufferSource();
-  s.buffer = toneBuffer(S, kind, midi);
+  s.buffer = buf;
   if (bend && s.detune) {
     s.detune.setValueAtTime(bend, t);
     s.detune.linearRampToValueAtTime(0, t + 0.045);
@@ -1005,6 +1436,45 @@ function playTone(S, out, t, kind, midi, vel, dur, bend) {
     g.gain.setTargetAtTime(0, t + dur, 0.025);
     s.stop(t + dur + 0.15);
   }
+  releaseOnEnd(s, [s, g]);
+}
+
+/**
+ * Соло-гитара: нота из кэша тонов с подтяжкой (bend центов → 0 за bt с: бенд или слайд от
+ * предыдущей ноты) и вибрато o.vib центов с частотой o.vibRate, вступающим постепенно. Высота
+ * ведётся кривой detune самого источника — нота стоит те же 2 узла.
+ */
+function playGuitar(S, out, t, kind, midi, vel, dur, o, bend, bt) {
+  const buf = toneBuffer(S, kind, midi);
+  if (!buf) return;
+  const ctx = S.ctx;
+  const s = ctx.createBufferSource();
+  s.buffer = buf;
+  const g = gainNode(ctx, vel);
+  s.connect(g).connect(out);
+  const end = t + Math.max(0.03, Math.min(dur, buf.duration - 0.05));
+  const p = s.detune;
+  let t1 = t;
+  if (bend && p) {
+    t1 = t + bt;
+    p.setValueAtTime(bend, t);
+    p.linearRampToValueAtTime(0, t1);
+  }
+  const v0 = t1 + 0.1;
+  if (o.vib && p && end - v0 > 0.2) {
+    const len = end - v0;
+    const n = Math.ceil(len * o.vibRate * 16) + 2;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * len;
+      curve[i] = o.vib * Math.min(1, x / 0.3) * Math.sin(2 * Math.PI * o.vibRate * x);
+    }
+    p.setValueCurveAtTime(curve, v0, len);
+  }
+  s.start(t);
+  g.gain.setValueAtTime(vel, end);
+  g.gain.setTargetAtTime(0, end, 0.03);
+  s.stop(end + 0.2);
   releaseOnEnd(s, [s, g]);
 }
 
@@ -1047,9 +1517,10 @@ function strumUke(S, out, t, notes, vel, kind, gate) {
  * Японская бамбуковая флейта (синобуэ / сякухати): треугольник + синус октавой выше, полоса
  * шума дыхания с «чиффом» на атаке, подъезд к ноте снизу или форшлаг сверху (у связных нот —
  * портаменто от предыдущей) и вибрато через detune, вступающее с задержкой.
- * o: { breath, scoop (полутона), grace (доля нот с форшлагом), slide (с), vibCents, vibRate, attack, release, cutoff, mix2 }
+ * bend — медленный подъезд снизу на bend центов (мери-кари сякухати, нота с «^» в мелодии).
+ * o: { breath, scoop (полутона), grace (доля нот с форшлагом), slide (с), vibCents, vibRate, attack, release, cutoff, mix2, bendT }
  */
-function synthFue(S, out, t, dur, midi, vel, o, glideFrom) {
+function synthFue(S, out, t, dur, midi, vel, o, glideFrom, bend) {
   const ctx = S.ctx;
   const f = mtof(midi);
   dur = Math.max(0.05, dur);
@@ -1065,12 +1536,16 @@ function synthFue(S, out, t, dur, midi, vel, o, glideFrom) {
   b.connect(bg).connect(lp);
   lp.connect(g).connect(out);
   const nodes = [a, b, bg, lp, g];
-  const grace = !glideFrom && dur > 0.2 && Math.random() < (o.grace || 0);
+  const grace = !glideFrom && !bend && dur > 0.2 && Math.random() < (o.grace || 0);
   for (const [ob, r] of [[a, 1], [b, 2]]) {
     const p = ob.frequency;
     if (glideFrom) {
       p.setValueAtTime(glideFrom * r, t);
       p.exponentialRampToValueAtTime(f * r, t + (o.slide || 0.05));
+    } else if (bend) {
+      p.setValueAtTime(f * r * Math.pow(2, -bend / 1200), t);
+      p.setValueAtTime(f * r * Math.pow(2, -bend / 1200), t + 0.03);
+      p.exponentialRampToValueAtTime(f * r, t + (o.bendT || 0.15));
     } else if (grace) {
       // форшлаг: палец на мгновение открывает отверстие — нота на тон выше
       p.setValueAtTime(f * r * 1.122, t);
@@ -1182,21 +1657,27 @@ function synthSupersaw(S, out, t, dur, midi, vel, o, glideFrom) {
 //
 // chords : one entry per bar, a symbol or [firstHalf, secondHalf]
 // melody : one string per bar; 8 tokens = 8th notes, 16 tokens = 16ths.
-//          'A5' note, '-' hold (ties across bars), '.' rest
+//          'A5' note, '-' hold (ties across bars), '.' rest; 'A5^' — нота с подтяжкой снизу
+//          (бенд гитары, мери сякухати) на lead.bend центов
 // parts  : per-section 16-step patterns. form picks the section per bar;
 //          'fill' replaces the drums on the last bar of every 8.
 //   kick/snare: x = hit, o = ghost   hat: x accent, h soft, o open
 //   bass: R root(slash bass), O octave, 5 fifth, '-' hold, '.' rest
 //   chord/arp: x = hit
 //   riff: как bass, но инструментом def.riff на def.riff.octave выше (сямисэн)
-//   chord: у укулеле x — бой вниз, u — вверх, m — глушёный; у стабов o — оркестровый удар
-//   taiko/ka/clack/kane/conga/bongo: x удар, o тихий, l низкий барабан
+//   chord: у укулеле x — бой вниз, u — вверх, m — глушёный; у стабов o — оркестровый удар;
+//          у электрогитары (kind из AMPS) x — открытый квинтаккорд звенит до следующего удара,
+//          o — он же с акцентом, m — глушёный ладонью «чанк» (def.chord.mute)
+//   taiko/ka/clack/kane/conga/bongo/ride: x удар, o тихий, l низкий барабан
 //   gliss: x — глиссандо кото по ладу def.gliss вверх, d — вниз
 //   altLead: true — мелодию секции играет def.altLead вместо def.lead
+//   voice: 'имя' — мелодию секции играет голос def[имя] (вместо lead / altLead)
 // extra  : layers added by setMusicIntensity(1) (plus lead doubled an octave up)
-// lead.kind: fue (синобуэ), supersaw, pan (стил-пэн), koto, иначе synthLead;
-// lead.double — интервал дублирования мелодии на финальном круге (по умолчанию +12).
-// snareKind / hatKind — замена сэмпла малого барабана / хэта (gsnare, shaker).
+// lead.kind: fue (синобуэ), shaku (сякухати, тот же голос), supersaw, pan (стил-пэн), koto,
+// shamisen, электрогитара из AMPS (glead — соло с бендами и вибрато vib/vibRate), иначе synthLead;
+// lead.double — интервал дублирования мелодии на финальном круге (по умолчанию +12);
+// lead.with — второй инструмент в унисон ({ kind, vel, shift — сдвиг в полутонах }, канал riff).
+// kickKind / snareKind / hatKind — замена сэмпла бочки / малого / хэта (rkick; gsnare, rsnare; shaker).
 // ---------------------------------------------------------------------------
 
 const THEMES = {
@@ -1539,6 +2020,122 @@ const THEMES = {
     extra: { hat: 'hhxhhhxhhhxhhhxh', bongo: '..o...o...o...o.', arp: 'x.xxx.xxx.xxx.xx' },
   },
 
+  // «Кленовый Перевал» — японский рок в духе аниме-опенингов и «вагакки-бэнда», 168 BPM, ми минор
+  // с японским ладом ин (E–F–A–B–C) в мелодиях. Каркас — перегруженные гитары двумя дублями L/R
+  // и бас-гитара восьмыми. A/H: рифф сямисэна в унисон с гитарой октавой ниже (во второй
+  // четвёрке — глушёные «чанки» и тайко); B: куплет сякухати под глушёные восьмые;
+  // C: предприпев по квинтовому кругу Am7–D–Gmaj7–Cmaj7 и iv–V–i с открытыми аккордами на
+  // «3+3+2», райдом и тайко; D: припев — соло-гитара с бендами и вибрато на андалусском ходе
+  // Em–D–C–B7, открытые аккорды восьмыми. Тарелка в начале каждой секции, сбивка — томы и тайко.
+  momiji: {
+    bpm: 168,
+    swing: 0,
+    form: 'AAAAHHHHBBBBBBBBCCCCCCCCDDDDDDDD',
+    padCenter: 64,
+    bassLow: 28,
+    kickKind: 'rkick',
+    snareKind: 'rsnare',
+    chords: [
+      'Em', 'Em', ['C', 'D'], 'Em', 'Em', 'Em', ['C', 'D'], 'B7',
+      'Em', 'Em', 'Cmaj7', 'D', 'Em', 'Em', 'Am7', ['Bsus4', 'B7'],
+      'Am7', 'D', 'Gmaj7', 'Cmaj7', 'Am7', 'B7', 'Em', ['C', 'D'],
+      'Em', 'D', 'C', 'B7', 'Em', 'D', 'C', 'B7',
+    ],
+    melody: [
+      'E4 F4 A4 B4 C5 - B4 A4 B4 - E5 - D5 - B4 -',
+      'A4 - B4 - C5 B4 A4 F4 E4 - - - . . . .',
+      'E5 - C5 - G4 - C5 - F#5 - D5 - A4 - D5 -',
+      'E5 - B4 - G4 - B4 - E5 - F5 - E5 - . .',
+      'E4 F4 A4 B4 C5 - B4 A4 B4 - E5 - D5 - B4 -',
+      'A4 - B4 - C5 B4 A4 F4 E4 - - - . . . .',
+      'E5 - C5 - G4 - C5 - F#5 - D5 - A4 - D5 -',
+      'D#5 - B4 - F#4 - B4 - A4 - F#4 - D#4 - B3 -',
+      'B4 - E5 - F5 E5 G5 -',
+      'A5 - - - G5 F5 E5 -',
+      'G5 - - - E5 - D5 E5',
+      'F#5^ - - - - - . .',
+      'B4 - E5 - F5 E5 G5 -',
+      'B5 - - - C6 B5 A5 -',
+      'C6^ - - - B5 - A5 -',
+      'B5 - - - F#5 - A5 -',
+      'E5 - A5 - C6 - - B5',
+      'A5 - - - F#5 - D5 -',
+      'D5 - G5 - B5 - - A5',
+      'G5 - - - E5^ - - -',
+      'C5 - E5 - A5 - - G5',
+      'F#5 - - - A5 - C6 B5',
+      'B5^ - - - - - . .',
+      'E5 - G5 - A5 - B5 -',
+      'B4 - E5 - G5 - B5^ -',
+      '- - A5 - - - F#5 -',
+      'G5 - - - E5 - C6 -',
+      'B5 - - - - - - -',
+      'B4 - E5 - G5 - E6^ -',
+      '- - D6 - - - A5 -',
+      'C6 - - - B5 - G5 -',
+      'F#5 - - - A5 - B5 -',
+    ],
+    lead: { kind: 'shaku', vel: 0.19, breath: 0.42, scoop: 1, grace: 0.12, slide: 0.07, vibCents: 28, vibRate: 4.9, attack: 0.05, release: 0.14, cutoff: 3800, mix2: 0.14, glide: true, bend: 100, bendT: 0.18, double: -12 },
+    hook: { kind: 'shamisen', vel: 0.8, double: 12, with: { kind: 'griff', vel: 0.17, shift: -12 } },
+    solo: { kind: 'glead', vel: 0.57, vib: 26, vibRate: 5.7, bend: 200, bendT: 0.11, double: -12 },
+    bass: { kind: 'gbass', vel: 0.69, gate: 0.85 },
+    pad: { vel: 0.01, attack: 0.5, release: 0.7, cut0: 1600, cut1: 2600, cutTc: 0.6, detune: 12, sustain: 1 },
+    chord: { kind: 'gtr', mute: 'gmute', low: 40, vel: 0.41 },
+    mix: { kick: { g: 0.37 }, lead: { d: 0.22, r: 0.24 }, lead2: { d: 0.15, r: 0.2 }, riff: { d: 0.06, r: 0.08 }, chord: { d: 0, r: 0.07 }, bass: { g: 0.75 }, perc: { g: 0.27, r: 0.14 }, snare: { g: 0.58, r: 0.16 } },
+    parts: {
+      A: {
+        kick: 'x.....x.x.......',
+        snare: '....x.......x...',
+        hat: 'x.h.x.h.x.h.x.h.',
+        taiko: 'x...............',
+        bass: 'R.R.R.R.R.R.R.R.',
+        voice: 'hook',
+      },
+      H: {
+        kick: 'x.....x.x.....x.',
+        snare: '....x.......x...',
+        hat: 'x.h.x.h.x.h.x.h.',
+        taiko: 'x.......x.......',
+        bass: 'R.R.R.R.R.R.O.R.',
+        chord: 'm.m.m.m.m.m.m.m.',
+        voice: 'hook',
+      },
+      B: {
+        kick: 'x.......x.x.....',
+        snare: '....x.......x...',
+        hat: 'x.h.x.h.x.h.x.h.',
+        bass: 'R.R.R.R.R.R.R.RR',
+        chord: 'x.m.m.m.m.m.m.mm',
+      },
+      C: {
+        kick: 'x.....x.....x...',
+        snare: '........x.......',
+        ride: 'x.o.x.o.x.o.x.o.',
+        taiko: 'x.....x.....x...',
+        bass: 'R-----R-----R-O-',
+        chord: 'x.....x.....x...',
+        pad: true,
+      },
+      D: {
+        kick: 'x.....x.x.....x.',
+        snare: '....x.......x...',
+        ride: 'x.o.x.o.x.o.x.o.',
+        taiko: 'x...............',
+        bass: 'R.R.O.R.R.R.O.R.',
+        chord: 'x.x.x.x.x.x.x.x.',
+        voice: 'solo',
+      },
+      fill: {
+        kick: 'x.......x.......',
+        snare: '....x.......xxxx',
+        hat: 'x.h.x.h.........',
+        tom: '......x.x.x.....',
+        taiko: 'x.......x.....x.',
+      },
+    },
+    extra: { hat: '.h.h.h.h.h.h.h.h', taiko: '......o.......o.' },
+  },
+
   // Short, loopable victory-lap disco groove (C major).
   results: {
     bpm: 124,
@@ -1606,9 +2203,11 @@ function parseMelody(bars) {
       if (tok === '-') {
         if (last) last.len += stepLen;
       } else {
-        const m = tok === '.' ? null : parseNote(tok);
+        const bend = tok.endsWith('^');
+        const m = tok === '.' ? null : parseNote(bend ? tok.slice(0, -1) : tok);
         if (m !== null) {
           last = { step: Math.round(pos), len: stepLen, midi: m };
+          if (bend) last.bend = true;
           map.set(last.step, last);
         } else last = null;
       }
@@ -1662,28 +2261,61 @@ function patNote(kind, h) {
   return m;
 }
 
-/** Тоны [инструмент, нота], которые понадобятся теме: плеер греет их заранее по одному за тик. */
+/** Голос мелодии секции: part.voice (ключ def), altLead или lead. */
+const leadOf = (def, part) => (part.voice && def[part.voice]) || (part.altLead && def.altLead) || def.lead;
+
+/**
+ * Тоны [инструмент, нота, первый шаг, первый шаг с финальным кругом], которые понадобятся теме,
+ * в порядке первого звучания: плеер греет их заранее, кусками (MusicPlayer.warmUp). Тоны только
+ * финального круга (дубль мелодии, партии extra) и слоёв, которых нет в партиях секций, — в конце.
+ */
 function themeTones(th) {
   const def = th.def;
   const keys = new Map();
-  const add = (kind, m) => {
-    if (kind === 'pan' || STRINGS[kind]) keys.set(kind + m, [kind, m]);
-  };
-  for (const [step, ev] of th.melody) {
-    const part = th.parts[def.form[step >> 4]];
-    const L = part.altLead && def.altLead ? def.altLead : def.lead;
-    add(L.kind, ev.midi);
-    add(L.kind, ev.midi + (L.double || 12));
-  }
-  for (const hb of th.harm) {
-    for (const h of hb) {
-      if (def.arp) for (const i of def.arp.seq) add(def.arp.kind, h.ext[i % h.ext.length]);
-      if (def.riff) for (const k of 'RO5') add(def.riff.kind, patNote(k, h) + def.riff.octave);
-      if (def.chord) for (const m of h.chordNotes.length < 4 ? h.chordNotes.concat(h.chordNotes[0] + 12) : h.chordNotes) add(def.chord.kind, m);
+  const add = (kind, m, first, firstI) => {
+    if (!isTone(kind)) return;
+    const e = keys.get(kind + m);
+    if (!e) keys.set(kind + m, [kind, m, first, firstI]);
+    else {
+      e[2] = Math.min(e[2], first);
+      e[3] = Math.min(e[3], firstI);
     }
+  };
+  const NEVER = Infinity;
+  for (const [step, ev] of th.melody) {
+    const L = leadOf(def, th.parts[def.form[step >> 4]]);
+    add(L.kind, ev.midi, step, step);
+    add(L.kind, ev.midi + (L.double || 12), NEVER, step);
+    if (L.with) add(L.with.kind, ev.midi + (L.with.shift || 0), step, step);
   }
-  if (th.gliss) for (const m of th.gliss) add('koto', m);
-  return [...keys.values()];
+  th.harm.forEach((hb, bar) => {
+    const part = th.parts[def.form[bar]];
+    for (const h of hb) {
+      const at = bar * 16 + h.from;
+      if (def.arp) {
+        const on = part.arp ? at : NEVER;
+        for (const i of def.arp.seq) add(def.arp.kind, h.ext[i % h.ext.length], on, on === NEVER && th.extra.arp ? at : on);
+      }
+      if (def.riff) for (const k of 'RO5') add(def.riff.kind, patNote(k, h) + def.riff.octave, part.riffSeq ? at : NEVER, part.riffSeq ? at : NEVER);
+      if (def.chord && AMPS[def.chord.kind]) {
+        // электрогитара: открытый и глушёный квинтаккорд от основного тона аккорда
+        const m = lowestAbove(h.root % 12, def.chord.low);
+        const pat = part.chord || '';
+        if (/[xo]/.test(pat)) add(def.chord.kind, m, at, at);
+        if (pat.includes('m')) add(def.chord.mute, m, at, at);
+      } else if (def.chord) {
+        const on = part.chord ? at : NEVER;
+        for (const m of h.chordNotes.length < 4 ? h.chordNotes.concat(h.chordNotes[0] + 12) : h.chordNotes) add(def.chord.kind, m, on, on);
+      }
+      if (part.bassSeq && def.bass && isTone(def.bass.kind)) for (const b of part.bassSeq) if (b) add(def.bass.kind, patNote(b.kind, h), at, at);
+    }
+  });
+  if (th.gliss) {
+    const g = (th.parts.fill && th.parts.fill.gliss) || '';
+    const at = 7 * 16 + Math.max(0, g.search(/[xd]/));
+    for (const m of th.gliss) add('koto', m, at, at);
+  }
+  return [...keys.values()].sort((a, b) => a[2] - b[2]);
 }
 
 /** Ноты лада g.scale ('A B C E F') от g.from до g.to — пробег для глиссандо. */
@@ -1844,7 +2476,24 @@ class MusicPlayer {
     dr.delayTime.value = dt;
     this.stopTime = Infinity;
     this.lastLead = null;
-    this.warm = theme.tones.slice();
+    // очередь прогрева: ещё не готовые тоны темы в порядке первого звучания (с финальным кругом — свой порядок)
+    const S = this.S;
+    this.pr = this.intensity ? 3 : 2;
+    this.warm = theme.tones.filter((e) => !S.tones.has(e[0] + e[1]));
+    if (this.intensity) this.warm.sort((a, b) => a[3] - b[3]);
+    for (const e of this.warm) S.pending.add(e[0] + e[1]);
+    this.started = false;
+    this.startTime = startTime;
+    this.holdUntil = startTime + HOLD_MAX;
+  }
+
+  /** Греет тоны очереди до момента deadline (clock(), мс) — синтез кусками, начатый тон продолжится в следующий раз. */
+  warmUp(deadline) {
+    const w = this.warm;
+    while (w.length && clock() < deadline) {
+      if (!warmTone(this.S, w[0][0], w[0][1], deadline)) return;
+      w.shift();
+    }
   }
 
   _applyTempo() {
@@ -1873,10 +2522,15 @@ class MusicPlayer {
 
   /** Called by the manager's timer: schedule every step that starts before `horizon`. */
   scheduleUntil(horizon, now) {
-    // по одному тону темы за тик заранее — без рывков, когда нота прозвучит впервые
-    if (this.warm.length && this.stopTime === Infinity) {
-      const [kind, m] = this.warm.shift();
-      toneBuffer(this.S, kind, m);
+    if (!this.started) {
+      // начало темы ждёт тоны первых HOLD_STEPS шагов (не дольше HOLD_MAX): вступает чуть позже, зато целиком
+      const w = this.warm;
+      if (w.length && w[0][this.pr] < HOLD_STEPS && now < this.holdUntil) {
+        this.nextTime = Math.max(this.nextTime, now + 0.06);
+        return;
+      }
+      this.started = true;
+      this.holdMs = Math.round((this.nextTime - this.startTime) * 1000);
     }
     if (this.nextTime < now - 0.08) {
       // Fell behind (throttled timer / hiccup): skip ahead but stay on the grid.
@@ -1938,7 +2592,12 @@ class MusicPlayer {
     if (c.kind === 'ep') synthEP(S, out, t, gate * 0.95, h.chordNotes, c.vel);
     else if (c.kind === 'marimba') for (const n of h.chordNotes) synthMarimba(S, out, t, n, c.vel, c.decay);
     else if (c.kind === 'uke') strumUke(S, out, t, h.chordNotes, c.vel, hit, Math.min(gate * 0.95, c.maxGate || 0.4));
-    else if (hit === 'o') {
+    else if (AMPS[c.kind]) {
+      // электрогитара: квинтаккорд от основного тона; открытый звенит до следующего удара
+      const m = lowestAbove(h.root % 12, c.low);
+      if (hit === 'm') playTone(S, out, t, c.mute, m, c.vel, Math.min(gate, 0.3), 0);
+      else playTone(S, out, t, c.kind, m, c.vel * (hit === 'o' ? 1.25 : 1), gate * 0.97, 0);
+    } else if (hit === 'o') {
       // оркестровый удар: тот же аккорд с басом октавой ниже, громче, с шумовой атакой
       synthChordSaw(S, out, t, Math.min(gate * 0.9, 0.3), [h.chordNotes[0] - 12].concat(h.chordNotes), c.vel * 1.3, c);
       sNoise(S, out, t, { type: 'bandpass', f: 2400, f1: 500, q: 0.7, a: 0.001, peak: c.vel * 4, dur: 0.14 });
@@ -1965,14 +2624,19 @@ class MusicPlayer {
     }
   }
 
-  /** Мелодия голосом из настроек L (kind выбирает инструмент). */
-  _lead(out, t, dur, midi, vel, L, glide) {
+  /** Мелодия голосом из настроек L (kind выбирает инструмент); bend — нота с «^» (подтяжка снизу). */
+  _lead(out, t, dur, midi, vel, L, glide, bend) {
     const S = this.S;
-    if (L.kind === 'fue') synthFue(S, out, t, dur, midi, vel, L, glide);
+    if (L.kind === 'fue' || L.kind === 'shaku') synthFue(S, out, t, dur, midi, vel, L, glide, bend ? L.bend || 100 : 0);
     else if (L.kind === 'supersaw') synthSupersaw(S, out, t, dur, midi, vel, L, glide);
     else if (L.kind === 'pan') synthPan(S, out, t, dur, midi, vel, L, this.stepDur);
     else if (L.kind === 'koto') synthKoto(S, out, t, dur, midi, vel, L, this.stepDur);
-    else synthLead(S, out, t, dur, midi, vel, L, glide);
+    else if (L.kind === 'shamisen') playTone(S, out, t, 'shamisen', midi, vel, dur + 0.02, 20);
+    else if (AMPS[L.kind]) {
+      // слайд от предыдущей связной ноты или бенд на тон снизу
+      if (glide) playGuitar(S, out, t, L.kind, midi, vel, dur, L, 1200 * Math.log2(glide / mtof(midi)), 0.05);
+      else playGuitar(S, out, t, L.kind, midi, vel, dur, L, bend ? -(L.bend || 200) : 0, L.bendT || 0.1);
+    } else synthLead(S, out, t, dur, midi, vel, L, glide);
   }
 
   _scheduleStep(step, t0) {
@@ -2004,7 +2668,7 @@ class MusicPlayer {
     if (s === 0 && bar % 8 === 0 && def.crash !== false) this._drum('crash', ch.perc.input, t, 0.8);
     let c = dr.kick && dr.kick[s];
     if (c === 'x' || c === 'o') {
-      this._drum('kick', ch.kick.input, t, c === 'x' ? 1 : 0.6);
+      this._drum(def.kickKind || 'kick', ch.kick.input, t, c === 'x' ? 1 : 0.6);
       if (def.pump) this._pump(t);
     }
     c = dr.snare && dr.snare[s];
@@ -2031,7 +2695,11 @@ class MusicPlayer {
     const h = hb.length > 1 && s >= hb[1].from ? hb[1] : hb[0];
 
     const bs = part.bassSeq && part.bassSeq[s];
-    if (bs) synthBass(S, ch.bass.input, t, bs.len * sd * (def.bass.gate || 0.85), patNote(bs.kind, h), def.bass.vel, def.bass.kind);
+    if (bs) {
+      const B = def.bass;
+      if (AMPS[B.kind]) playTone(S, ch.bass.input, t, B.kind, patNote(bs.kind, h), B.vel, bs.len * sd * (B.gate || 0.85), 0);
+      else synthBass(S, ch.bass.input, t, bs.len * sd * (B.gate || 0.85), patNote(bs.kind, h), B.vel, B.kind);
+    }
 
     const rs = part.riffSeq && part.riffSeq[s];
     if (rs && def.riff) {
@@ -2061,17 +2729,21 @@ class MusicPlayer {
     // --- melody
     const ev = th.melody.get(step);
     if (ev) {
-      const L = part.altLead && def.altLead ? def.altLead : def.lead;
+      const L = leadOf(def, part);
       const dur = ev.len * sd - 0.012;
       const prev = this.lastLead;
       let glide = null;
       if (L.glide && prev && prev.midi !== ev.midi && Math.abs(prev.end - t) < 0.03 && Math.abs(ev.midi - prev.midi) <= 7) {
         glide = mtof(prev.midi);
       }
-      this._lead(ch.lead.input, t, dur, ev.midi, L.vel, L, glide);
+      this._lead(ch.lead.input, t, dur, ev.midi, L.vel, L, glide, ev.bend);
+      if (L.with) {
+        const W = L.with;
+        this._lead(ch.riff.input, t, dur, ev.midi + (W.shift || 0), W.vel, W, null, false);
+      }
       if (inten) {
         const dbl = L.double || 12;
-        this._lead(ch.lead2.input, t, dur, ev.midi + dbl, L.vel * 0.3, L, glide ? glide * Math.pow(2, dbl / 12) : null);
+        this._lead(ch.lead2.input, t, dur, ev.midi + dbl, L.vel * 0.3, L, glide ? glide * Math.pow(2, dbl / 12) : null, ev.bend);
       }
       this.lastLead = { midi: ev.midi, end: t + ev.len * sd };
     }
@@ -2568,7 +3240,9 @@ export class AudioManager {
   _init() {
     const ctx = new this._AC({ latencyHint: 'interactive' });
     this.ctx = ctx;
-    this.S = { ctx, noise: makeNoiseBuffer(ctx, 2), tones: new Map() };
+    // tones — готовые буферы тонов, jobs — начатый синтез, pending — тоны в очередях прогрева,
+    // missed — сколько нот пропущено, потому что их тон ещё не был готов
+    this.S = { ctx, noise: makeNoiseBuffer(ctx, 2), tones: new Map(), jobs: new Map(), pending: new Set(), missed: 0 };
 
     this.master = gainNode(ctx, this._muted ? 0 : MASTER_LEVEL);
     this.comp = ctx.createDynamicsCompressor();
@@ -2668,6 +3342,7 @@ export class AudioManager {
   }
 
   _startTheme(name, fade) {
+    const t0 = clock(); // бюджет прогрева первого тика считается от начала вызова
     const ctx = this.ctx;
     const now = ctx.currentTime;
     const hadMusic = !!this._current;
@@ -2677,7 +3352,7 @@ export class AudioManager {
     this._current = player;
     this._players.push(player);
     this._ensureTimer();
-    this._tick();
+    this._tick(t0);
   }
 
   stopMusic(fade = 1.0) {
@@ -2710,9 +3385,11 @@ export class AudioManager {
     this._timer = setInterval(() => this._tick(), TIMER_MS);
   }
 
-  _tick() {
+  /** Тик планировщика; t0 — начало задачи (clock()), от него отсчитывается бюджет прогрева тонов. */
+  _tick(t0) {
     const ctx = this.ctx;
     if (!ctx) return;
+    const start = t0 || clock();
     const now = ctx.currentTime;
     const hidden = typeof document !== 'undefined' && document.hidden;
     const horizon = now + (hidden ? 1.5 : LOOKAHEAD);
@@ -2725,6 +3402,9 @@ export class AudioManager {
         }
       }
     }
+    // тоны текущей темы греются кусками в остаток бюджета WARM_MS от начала тика (и на паузе тоже)
+    const cur = this._current;
+    if (cur && cur.warm.length) cur.warmUp(start + WARM_MS);
     if (this._players.length) {
       const n = this._players.length;
       this._players = this._players.filter((p) => {
@@ -2735,10 +3415,14 @@ export class AudioManager {
         return true;
       });
       if (this._players.length < n) {
-        // тема отзвучала — её тоны больше не нужны, освобождаем память
+        // тема отзвучала — её тоны больше не нужны, освобождаем память (и бросаем недоделанный синтез)
+        const S = this.S;
         const keep = new Set();
         for (const p of this._players) for (const [k, m] of p.th.tones) keep.add(k + m);
-        for (const key of this.S.tones.keys()) if (!keep.has(key)) this.S.tones.delete(key);
+        for (const key of S.tones.keys()) if (!keep.has(key)) S.tones.delete(key);
+        for (const key of S.jobs.keys()) if (!keep.has(key)) S.jobs.delete(key);
+        S.pending.clear();
+        for (const p of this._players) for (const [k, m] of p.warm) S.pending.add(k + m);
       }
     }
     if (!this._players.length && this._timer) {
