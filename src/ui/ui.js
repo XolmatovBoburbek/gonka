@@ -37,7 +37,7 @@ export class UI {
             <button class="btn focusable" data-act="settings">НАСТРОЙКИ</button>
           </div>
         </div>
-        <div class="title-foot">8 гонщиков · 3 локации · Турбо, Сфера, Барьер и Лёд · Enter — играть</div>
+        <div class="title-foot">8 гонщиков · 4 локации · Турбо, Сфера, Барьер и Лёд · Enter — играть</div>
       </div>
 
       <div class="screen select-screen" data-screen="select">

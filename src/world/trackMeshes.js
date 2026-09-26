@@ -68,8 +68,9 @@ export function makeRoadTexture(o = {}) {
   // центральная пунктирная
   if (o.centerLine !== false) {
     g.fillStyle = o.centerLine ?? '#ffe070';
-    const dash = o.dashed === false ? H : H * 0.45;
-    g.fillRect(W * 0.49, H * 0.05, W * 0.02, dash);
+    // сплошная линия — на всю высоту текстуры, иначе на стыке повторов остаётся просвет
+    if (o.dashed === false) g.fillRect(W * 0.49, 0, W * 0.02, H);
+    else g.fillRect(W * 0.49, H * 0.05, W * 0.02, H * 0.45);
   }
   if (o.laneLines) {
     g.fillStyle = o.laneLines;

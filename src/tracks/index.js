@@ -24,6 +24,14 @@ export const TRACKS = [
     card: ['#ff9a3c', '#ff4f9a'],
     load: () => import('./sunset.js').then((m) => m.sunset),
   },
+  {
+    id: 'momiji',
+    name: 'Кленовый Перевал',
+    jp: '紅葉峠',
+    time: 'Осеннее утро',
+    card: ['#ff5a2e', '#ffc93c'],
+    load: () => import('./momiji.js').then((m) => m.momiji),
+  },
 ];
 
 export function getTrackMeta(id) {

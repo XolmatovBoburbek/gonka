@@ -1455,7 +1455,7 @@ kbd {
   }
   .track {
     height: 80px;
-    width: calc(33% - 8px);
+    width: calc(25% - 9px);
   }
   .track .tname {
     margin-top: 18px;
@@ -1483,6 +1483,15 @@ kbd {
     white-space: normal;
     text-align: center;
     width: 90vw;
+  }
+}
+@media (max-width: 560px) {
+  /* узкий портрет: трассы сеткой 2×2 по ширине экрана (не по ширине строки настроек) */
+  .sel-bottom {
+    flex-wrap: nowrap;
+  }
+  .track {
+    width: calc(50% - 6px);
   }
 }
 @media (max-height: 640px) {
@@ -1588,12 +1597,18 @@ kbd {
     flex-wrap: nowrap;
     gap: 10px;
   }
+  /* карточки трасс сжимаются, чтобы все (сейчас 4) поместились рядом с настройками */
   .tracks {
     flex-wrap: nowrap;
     gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .track {
-    width: 120px;
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    max-width: 120px;
     height: 62px;
     padding: 6px 10px;
   }
@@ -1606,8 +1621,12 @@ kbd {
   }
   .track .ttime {
     font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .opts {
+    flex: none;
     gap: 5px;
   }
   .opt-l {

@@ -600,6 +600,21 @@ export function createAmbientParticles(opts = {}) {
     base = new THREE.PlaneGeometry(0.03, 0.8);
   } else if (opts.shape === 'dot') {
     base = new THREE.IcosahedronGeometry(0.12, 0);
+  } else if (opts.shape === 'maple') {
+    // кленовый лист: пять лопастей звёздочкой, нижние короче
+    const s = new THREE.Shape();
+    const lobes = [0.2, 0.19, 0.13, 0.13, 0.19];
+    for (let i = 0; i < 10; i++) {
+      const a = Math.PI / 2 - (i / 10) * Math.PI * 2;
+      const r = i % 2 ? 0.075 : lobes[i / 2];
+      if (i) s.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      else s.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    s.closePath();
+    base = new THREE.ShapeGeometry(s);
+    const uv = base.getAttribute('uv');
+    const pos = base.getAttribute('position');
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.5, (pos.getY(i) + 0.14) / 0.34);
   } else {
     // лепесток сакуры: вытянутая капля с выемкой
     const s = new THREE.Shape();
