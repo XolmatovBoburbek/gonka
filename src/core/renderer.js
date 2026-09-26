@@ -249,6 +249,19 @@ export class Renderer {
       c.near = 0.5;
       c.far = 6000;
       c.updateProjectionMatrix();
+      // three.js рисует тени общим материалом глубины и меняет ему программу только при смене инстансинга —
+      // варианты с картой/стороной, не попавшие на такую смену, собрались бы посреди гонки (после смены
+      // ступени качества порядок теней другой). Здесь заставляем выбирать программу для каждого объекта.
+      const hooked = [];
+      const reselect = (r, o, cam, sc, geo, depthMat) => {
+        depthMat.needsUpdate = true;
+      };
+      scene.traverse((o) => {
+        if (o.castShadow && !Object.prototype.hasOwnProperty.call(o, 'onBeforeShadow')) {
+          o.onBeforeShadow = reselect;
+          hooked.push(o);
+        }
+      });
       try {
         R.shadowMap.needsUpdate = true;
         R.setRenderTarget(this.sceneRT);
@@ -256,6 +269,7 @@ export class Renderer {
       } catch {
         /* не критично */
       } finally {
+        for (const o of hooked) delete o.onBeforeShadow;
         R.setRenderTarget(prev);
         [c.left, c.right, c.top, c.bottom, c.near, c.far] = saved;
         c.updateProjectionMatrix();

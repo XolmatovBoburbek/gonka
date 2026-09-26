@@ -389,7 +389,9 @@ export class Game {
       this.world.update(dt, this.camera, focus);
       this.fx.update(dt, this.camera, this.renderer.height * this.renderer.pixelRatio);
     }
-    if (this.race && this.lod) this.race.updateLod(this.camera.position, this.lod.kart);
+    // порог — не ближе, чем где контур машинки (0.035 м) становится ~полпикселя: иначе у соперника впереди
+    // заметно "выключается" контур (0.05 × высота буфера: 36 м при 720, 54 м при 1080)
+    if (this.race && this.lod) this.race.updateLod(this.camera.position, Math.max(this.lod.kart, 0.05 * this.renderer.height * this.renderer.pixelRatio));
     this.updateScreenFx(dt);
     this.input.endFrame();
     if (render) this.renderer.render(dt, this.time);

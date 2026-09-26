@@ -831,7 +831,7 @@ export class KartView {
     this.headYaw = 0;
     this.flicker = 0;
 
-    // детали, которые издалека меньше пикселя: контуры, эмблема, шарфы (см. setFar)
+    // детали, которые издалека не больше полпикселя: контуры, эмблема, шарфы (см. setFar и Game.step)
     this.lodParts = [emblem, ...this.scarves.map((sc) => sc.mesh)];
     this.far = false;
     this.root.traverse((o) => {
