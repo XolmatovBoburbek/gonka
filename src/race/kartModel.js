@@ -889,11 +889,13 @@ export class KartView {
     this.body.rotation.y = s.spin || 0;
     const targetLean = -this.latSm * 0.07;
     this.visLean = THREE.MathUtils.lerp(this.visLean, targetLean, 1 - Math.exp(-dt * 8));
-    this.body.rotation.z = this.visLean;
+    // мотор на месте: дрожь корпуса и качание от крутящего момента — на перегазовке сильнее
+    const rev = s.rev || 0;
+    this.body.rotation.z = this.visLean + (rev ? rev * 0.035 + Math.sin(this.time * 31) * 0.005 * (0.3 + rev) : 0);
     const targetPitch = -this.accelSm * 0.05 + (s.airborne ? -0.08 : 0);
     this.visPitch = THREE.MathUtils.lerp(this.visPitch, targetPitch, 1 - Math.exp(-dt * 6));
     this.body.rotation.x = this.visPitch + (s.trick ? s.trick : 0);
-    this.body.position.y = (s.hop || 0) + Math.sin(this.time * 38) * 0.008 * speed01 + (s.bump || 0);
+    this.body.position.y = (s.hop || 0) + Math.sin(this.time * 38) * 0.008 * speed01 + (s.bump || 0) + (rev ? Math.sin(this.time * 57) * 0.005 * (0.35 + rev) : 0);
 
     // пилот наклоняется в поворот и смотрит туда
     this.driver.rotation.z = this.latSm * 0.16;

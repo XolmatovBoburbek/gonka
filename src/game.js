@@ -431,7 +431,9 @@ export class Game {
     if (this.autopilot && race.state === 'racing' && !player.finished) {
       const ap = race.autoPilot.think(dt, race);
       input = { ...inp, ...ap, item: ap.useItem, boost: ap.useBoost };
-    }
+    } else if (this.autopilot && race.state === 'countdown') input = { ...inp, throttle: race.autoPilot.revThrottle(dt, race) };
+    // сенсорный автогаз не жмёт газ на отсчёте: там обороты держат кнопкой ГАЗ
+    this.input.autoGasBlocked = race.state === 'intro' || race.state === 'countdown';
     if (inp.respawn && race.state === 'racing' && !player.finished) player.respawn();
     this.rig.lookBack = inp.lookBack && race.state === 'racing';
     race.update(dt, input);
@@ -457,21 +459,67 @@ export class Game {
       this.rig.updateChase(dt, player);
     }
 
-    // звук двигателя
-    if (race.state === 'racing' && !player.finished) {
+    // звук мотора: на отсчёте — перегазовка на месте, в гонке — обороты от скорости колёс; рядом — моторы соперников
+    if ((race.state === 'countdown' || race.state === 'racing') && !player.finished) {
+      const boosting = player.boost.time > 0;
       this.audio.updateEngine({
+        rpm: player.rev,
+        load: race.state === 'countdown' ? input.throttle : boosting ? 1 : input.throttle,
+        limiter: player.revLimit > 0 || player.launchSpin > 0,
         speed01: Math.abs(player.speed) / 40,
         throttle: input.throttle,
-        boosting: player.boost.time > 0,
-        drifting: player.drift.active,
+        boosting,
+        drifting: player.drift.active || player.launchSpin > 0,
         driftLevel: player.drift.level,
         offroad: player.offroad,
         airborne: player.airborne,
       });
+      this.audio.updateRivalEngines(this.rivalEngines(race));
     } else if (race.state === 'finished') this.audio.stopEngine();
 
     this.handleEvents(race.events, false);
     this.ui.hud.update(race, dt);
+  }
+
+  /** Моторы двух ближайших к камере соперников: громкость — по расстоянию, панорама — слева/справа от камеры. */
+  rivalEngines(race) {
+    const cam = this.camera;
+    const out = this._rivalList || (this._rivalList = [{}, {}]);
+    let a = null;
+    let b = null;
+    let da = 1e9;
+    let db = 1e9;
+    for (const k of race.karts) {
+      if (k === race.player) continue;
+      const d = k.pos.distanceToSquared(cam.position);
+      if (d < da) {
+        b = a;
+        db = da;
+        a = k;
+        da = d;
+      } else if (d < db) {
+        b = k;
+        db = d;
+      }
+    }
+    const right = this._camRight || (this._camRight = new THREE.Vector3());
+    right.setFromMatrixColumn(cam.matrixWorld, 0);
+    const pick = [a, b];
+    for (let i = 0; i < 2; i++) {
+      const k = pick[i];
+      const o = out[i];
+      if (!k) {
+        o.gain = 0;
+        continue;
+      }
+      const d = Math.sqrt(i ? db : da);
+      o.gain = Math.pow(Math.max(0, 1 - d / 45), 2);
+      o.pan = THREE.MathUtils.clamp(((k.pos.x - cam.position.x) * right.x + (k.pos.z - cam.position.z) * right.z) / Math.max(d, 1), -0.85, 0.85);
+      o.rpm = k.rev;
+      o.load = k.onGrid ? k.gridThrottle : k.boost.time > 0 ? 1 : k.throttle;
+      o.limiter = k.revLimit > 0 || k.launchSpin > 0;
+    }
+    return out;
   }
 
   /** Реакция на события гонки: звук, частицы, надписи, тряска. */
@@ -492,18 +540,31 @@ export class Game {
       switch (e.type) {
         case 'countdown':
           a.sfx('countdown');
+          if (e.n === 3) a.duck(0.4, 2.85); // на отсчёте музыку чуть тише — слышно, как ревут моторы
           this.ui.hud.countdown(e.n);
           break;
         case 'go':
           a.sfx('go');
           this.ui.hud.countdown(0);
+          if (this.input.autoGas) this.input.touch.gas = false; // педаль ГАЗ исчезла под пальцем — дальше автогаз
           break;
         // реакции игрока — надписями у спидометра (hud.callout), а не над машинкой: там они закрывали дорогу
-        case 'rocketStart':
-          this.ui.hud.callout('РАКЕТНЫЙ СТАРТ!', 'boost1');
-          break;
-        case 'stall':
-          this.ui.hud.callout('Фальстарт…', 'warn');
+        case 'launch':
+          if (!isP) break;
+          this.ui.hud.launchResult(e.result);
+          if (e.result === 'perfect') {
+            a.sfx('miniturbo2');
+            this.ui.hud.callout('СУПЕРСТАРТ!', 'boost2');
+            this.rig.shake(0.35);
+            this.flash = Math.max(this.flash, 0.1);
+          } else if (e.result === 'good') {
+            a.sfx('miniturbo1');
+            this.ui.hud.callout('ХОРОШИЙ СТАРТ!', 'boost1');
+            this.rig.shake(0.2);
+          } else if (e.result === 'spin') {
+            this.ui.hud.callout('ПРОБУКСОВКА!', 'warn');
+            this.rig.shake(0.25);
+          }
           break;
         case 'boost':
           // бусты складываются: второй поверх первого звучит выше

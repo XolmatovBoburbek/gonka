@@ -21,6 +21,7 @@ export class Input {
     this.touch = { steer: 0, gas: false, brake: false, drift: false, item: false, itemEdge: false, driftEdge: false, boostEdge: false };
     this.touchMode = false;
     this.autoGas = false;
+    this.autoGasBlocked = false; // на отсчёте автогаз не жмёт: обороты держат кнопкой ГАЗ
     this.padPrev = [];
     this.lastDevice = 'keyboard';
     this.enabled = true;
@@ -127,7 +128,7 @@ export class Input {
     if (this.touchMode) {
       const t = this.touch;
       if (t.steer) steer = t.steer;
-      if (t.gas || this.autoGas) s.throttle = Math.max(s.throttle, 1);
+      if (t.gas || (this.autoGas && !this.autoGasBlocked)) s.throttle = Math.max(s.throttle, 1);
       if (t.brake) {
         s.brake = 1;
         if (this.autoGas) s.throttle = 0;

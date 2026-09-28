@@ -35,6 +35,15 @@ export const PHYS = {
   ],
   // бусты из разных источников складываются (нитро + ускоритель на дороге + шкала), но не больше чем ×2
   boostStackMax: 1.0,
+  // старт: на отсчёте газ раскручивает мотор на месте (обороты 0..1, 1 — отсечка). Пока стрелка в зелёной
+  // зоне, копится заряд старта: полный на "СТАРТ!" — суперстарт, треть — хороший старт; в красной — пробуксовка
+  revUp: 0.8, // подъём оборотов при полном газе, доля шкалы в секунду
+  revDown: 0.55, // спад без газа
+  revZones: { good: 0.48, perfect: 0.62, perfectTop: 0.8, red: 0.9 },
+  revChargeTime: 0.7, // столько секунд в зелёной зоне — полный заряд
+  launchPerfect: [1.2, 1.32],
+  launchGood: [0.7, 1.2],
+  launchSpin: 0.7, // пробуксовка после старта на отсечке, с
 };
 
 const _tmp = new THREE.Vector3();
@@ -71,6 +80,15 @@ export class Kart {
     this.boosts = [];
     this.boost = { time: 0, power: 1, kind: '', stack: 0 };
     this.boostMeter = 0; // 0..3 деления
+    // мотор: rev — обороты 0..1 (0 — холостые, 1 — отсечка). На старте их держат газом (onGrid),
+    // в гонке они идут от скорости колёс
+    this.onGrid = false;
+    this.rev = 0;
+    this.revVel = 0;
+    this.revCharge = 0; // заряд старта 0..1
+    this.revLimit = 0; // > 0 — только что сработала отсечка
+    this.gridThrottle = 0;
+    this.launchSpin = 0; // > 0 — колёса буксуют после старта на отсечке
     this.spinTimer = 0;
     this.spinAngle = 0;
     this.frozenTimer = 0;
@@ -233,6 +251,79 @@ export class Kart {
     return true;
   }
 
+  /** Зона стрелки оборотов: 'low' | 'good' | 'perfect' | 'red'. */
+  revZone(r = this.rev) {
+    const Z = PHYS.revZones;
+    if (r >= Z.red) return 'red';
+    if (r >= Z.perfect && r <= Z.perfectTop) return 'perfect';
+    if (r >= Z.good) return 'good';
+    return 'low';
+  }
+
+  /** Отсчёт: карт стоит, газ раскручивает мотор; пока стрелка в зелёной зоне — копится заряд старта. */
+  revOnGrid(dt, throttle) {
+    const P = PHYS;
+    this.onGrid = true;
+    this.gridThrottle = throttle;
+    // стрелка тянется к "газу" (частичный газ геймпада держит частичные обороты), но не быстрее revUp/revDown,
+    // и с инерцией маховика: сразу после сброса газа ещё чуть поднимается
+    const target = throttle * 1.12;
+    const d = target - this.rev;
+    const want = d > 0 ? Math.min(P.revUp, d * 6) : Math.max(-P.revDown, d * 5);
+    this.revVel += (want - this.revVel) * (1 - Math.exp(-dt * 14));
+    this.rev += this.revVel * dt;
+    if (this.revLimit > 0) this.revLimit -= dt;
+    if (this.rev >= 1) {
+      // отсечка: зажигание рвётся, обороты проседают и снова упираются — "бра-бра-бра"
+      this.rev = 0.955;
+      this.revVel = 0;
+      this.revLimit = 0.08;
+    } else if (this.rev < 0) {
+      this.rev = 0;
+      this.revVel = Math.max(0, this.revVel);
+    }
+    const z = this.revZone();
+    const dc = z === 'perfect' ? 1 / P.revChargeTime : z === 'good' ? -0.25 : z === 'red' ? -1.2 : -0.8;
+    this.revCharge = Math.min(1, Math.max(0, this.revCharge + dc * dt));
+  }
+
+  /** "СТАРТ!": итог по заряду и стрелке. 'perfect' | 'good' | 'spin' | 'none'. */
+  launch() {
+    const P = PHYS;
+    const z = this.revZone();
+    this.onGrid = false;
+    let result = 'none';
+    if (z === 'red') {
+      result = 'spin';
+      this.launchSpin = P.launchSpin;
+    } else if (this.revCharge >= 0.999 && z !== 'low') {
+      result = 'perfect';
+      this.addBoost(P.launchPerfect[0], P.launchPerfect[1], 'rocket');
+    } else if (this.revCharge >= 0.35 && z !== 'low') {
+      result = 'good';
+      this.addBoost(P.launchGood[0], P.launchGood[1], 'rocket');
+    }
+    this.revCharge = 0;
+    this.emit('launch', { result });
+    return result;
+  }
+
+  /** Гонка: одна передача и центробежное сцепление — с места мотор держит обороты сцепления, дальше их тянут колёса. */
+  _revRace(dt, throttle) {
+    const v = Math.abs(this.speed) / PHYS.maxSpeed;
+    let target;
+    if (this.launchSpin > 0) target = 0.97;
+    else if (this.airborne) target = throttle > 0.1 ? 0.95 : 0.3; // колёса в воздухе — мотор без нагрузки
+    else {
+      target = Math.max(0.06 + 0.8 * Math.min(v, 1.2), 0.42 * throttle);
+      if (this.drift.active) target += 0.05; // задние колёса проскальзывают
+    }
+    target = Math.min(0.99, target);
+    this.rev += (target - this.rev) * (1 - Math.exp(-dt * (target > this.rev ? 7 : 4)));
+    this.revVel = 0;
+    this.revLimit = 0;
+  }
+
   respawn() {
     this._respawns = (this._respawns || 0) + 1;
     const back = this.progress - 4;
@@ -277,6 +368,7 @@ export class Kart {
       this.frozenTimer -= dt;
       if (this.frozenTimer <= 0) this.emit('unfreeze');
     }
+    if (this.launchSpin > 0) this.launchSpin -= dt;
 
     const ctrl = this.controllable && !this.finishedCoast;
     let throttle = ctrl ? input.throttle : 0;
@@ -304,7 +396,8 @@ export class Kart {
         if (this.speed < 0) this.speed += P.brake * dt;
         else if (this.speed < vmax) {
           const k = 1 - (this.speed / vmax) ** 2;
-          this.speed = Math.min(vmax, this.speed + P.accel * this.accelF * throttle * Math.max(0.1, k) * dt);
+          const grip = this.launchSpin > 0 ? 0.2 : 1; // пробуксовка на старте: колёса крутятся впустую
+          this.speed = Math.min(vmax, this.speed + P.accel * this.accelF * throttle * grip * Math.max(0.1, k) * dt);
         }
       }
       if (brake > 0.01 && !boosting) {
@@ -538,7 +631,9 @@ export class Kart {
       this.wrongWay = ww;
       this.emit('wrongWay', { on: ww });
     }
-    if (ctrl && throttle > 0.5 && Math.abs(this.speed) < 2.5 && !this.airborne) this.stuckTimer += dt;
+    if (!this.onGrid) this._revRace(dt, throttle);
+
+    if (ctrl && throttle > 0.5 && Math.abs(this.speed) < 2.5 && !this.airborne && this.launchSpin <= 0) this.stuckTimer += dt;
     else this.stuckTimer = Math.max(0, this.stuckTimer - dt);
     if (this.stuckTimer > (this.isPlayer ? 5 : 2.5)) this.respawn();
   }
@@ -560,6 +655,7 @@ export class Kart {
       hop: 0,
       trick: this.trick.active ? Math.min(1, this.trick.t / 0.45) * Math.PI * 2 : 0,
       frozen: this.frozenTimer > 0,
+      rev: this.onGrid || this.launchSpin > 0 ? this.rev : 0, // тряска от оборотов на месте
     };
   }
 }

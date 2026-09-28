@@ -189,6 +189,35 @@ export class BotDriver {
     return out;
   }
 
+  /**
+   * Отсчёт: газ импульсами, чтобы стрелка оборотов стояла в зелёной зоне. Точность, реакция и то, как рано
+   * начинает газовать, — по навыку; неумелые иногда жадничают и перегазовывают (пробуксовка на старте).
+   */
+  revThrottle(dt, race) {
+    const k = this.kart;
+    const s = this.skill;
+    if (!this.grid) {
+      const greedy = this.rnd() < 0.12 * (1 - s);
+      this.grid = {
+        start: 0.1 + this.rnd() * (0.5 + 1.8 * (1 - s)),
+        aim: greedy ? 0.93 : 0.71 + (this.rnd() - 0.5) * 0.5 * (1.1 - s),
+        react: 0.05 + 0.25 * (1 - s),
+        t: 0,
+        on: false,
+      };
+    }
+    const g = this.grid;
+    if (race.stateTime < g.start) return 0;
+    g.t -= dt;
+    if (g.t <= 0) {
+      g.t = g.react * (0.6 + this.rnd() * 0.8);
+      const pred = k.rev + k.revVel * 0.08; // стрелка по инерции ещё пройдёт немного
+      if (pred < g.aim - 0.03) g.on = true;
+      else if (pred > g.aim + 0.03) g.on = false;
+    }
+    return g.on ? 1 : 0;
+  }
+
   decideItem(race) {
     const k = this.kart;
     const tr = k.track;

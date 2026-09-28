@@ -1,6 +1,7 @@
 // Игровой HUD: предмет и рулетка, круг и время, место, спидометр и буст-шкала, миникарта,
 // отсчёт, баннеры, предупреждения и сенсорные кнопки.
 import { ITEM_ICONS, ITEM_NAMES } from './icons.js';
+import { PHYS } from '../race/kart.js';
 
 export function fmtTime(t) {
   if (!(t >= 0)) t = 0;
@@ -38,6 +39,15 @@ export class Hud {
         <div class="banner"></div>
         <div class="warn">↺ НЕ ТУДА!</div>
         <div class="hint"></div>
+        <div class="hud-rev">
+          <div class="rev-tip"></div>
+          <div class="rev-bar">
+            <div class="rev-seg rev-off"></div>
+            <div class="rev-seg rev-on"></div>
+            <div class="rev-zone"><i></i></div>
+            <div class="rev-needle"><i></i></div>
+          </div>
+        </div>
       </div>
       <div class="hud-intro">
         <div class="loc-jp"></div>
@@ -54,6 +64,7 @@ export class Hud {
           <button class="tb t-boost" data-k="boost">БУСТ</button>
           <button class="tb t-drift" data-k="drift">ДРИФТ</button>
           <button class="tb t-brake" data-k="brake">ТОРМОЗ</button>
+          <button class="tb t-gas" data-k="gas">ГАЗ</button>
         </div>
         <button class="tb t-pause" data-k="pause">❚❚</button>
       </div>
@@ -79,6 +90,12 @@ export class Hud {
     this.warnEl = this.$('.warn');
     this.hintEl = this.$('.hint');
     this.introEl = this.$('.hud-intro');
+    // шкала оборотов на старте: границы зон — из физики (одна правда для HUD и карта)
+    this.revEl = this.$('.hud-rev');
+    this.revTip = this.$('.rev-tip');
+    const Z = PHYS.revZones;
+    for (const [k, v] of [['--zg', Z.good], ['--zp', Z.perfect], ['--zt', Z.perfectTop], ['--zr', Z.red]]) this.revEl.style.setProperty(k, v);
+    this.revResT = 0;
     this.canvas = this.$('.hud-map canvas');
     this.ctx = this.canvas.getContext('2d');
     this.mapImg = null;
@@ -132,6 +149,7 @@ export class Hud {
         } else if (k === 'item') t.itemEdge = true;
         else if (k === 'boost') t.boostEdge = true;
         else if (k === 'brake') t.brake = true;
+        else if (k === 'gas') t.gas = true;
         else if (k === 'pause') this.ui.game.setPaused(!this.ui.game.paused);
       };
       const up = (e) => {
@@ -142,6 +160,7 @@ export class Hud {
           apply();
         } else if (k === 'drift') t.drift = false;
         else if (k === 'brake') t.brake = false;
+        else if (k === 'gas') t.gas = false;
       };
       b.addEventListener('pointerdown', down);
       b.addEventListener('pointerup', up);
@@ -166,6 +185,10 @@ export class Hud {
     this.calloutsEl.textContent = '';
     this.warnEl.classList.remove('on');
     this.hintEl.className = 'hint';
+    this.revEl.className = 'hud-rev';
+    this.revResT = 0;
+    this.el.classList.remove('counting', 'rev-busy');
+    this.ui.game.input.touch.gas = false; // кнопку ГАЗ могли не отпустить в прошлой гонке
     this.placeOf.textContent = '/' + race.karts.length;
     this.lapOf.textContent = '/' + race.laps;
     this._last = {};
@@ -196,6 +219,50 @@ export class Hud {
       el.classList.add('on', 'go');
       setTimeout(() => (el.className = 'count'), 1100);
     }
+  }
+
+  /** Отсчёт начался: шкала оборотов и подсказка под устройство. */
+  _revStart() {
+    const dev = this.touchEnabled ? 'touch' : this.ui.game.input.lastDevice === 'gamepad' ? 'pad' : 'kbd';
+    const key = { touch: 'Жми ГАЗ', pad: 'Газ <kbd>RT</kbd>', kbd: 'Газ <kbd>W</kbd>' }[dev];
+    this.revTipBase = `${key} — держи стрелку в <b class="g">зелёной зоне</b>`;
+    this.revTip.innerHTML = this.revTipBase;
+    this.revEl.className = 'hud-rev on';
+    this.revResT = 0;
+    this._last.rz = '';
+    this._last.r = -1;
+    this._last.c = -1;
+  }
+
+  /** Стрелка, заряд и подсказка по зоне: перегазовка — красным, полный заряд — "готов". */
+  _revUpdate(p) {
+    const r = Math.round(Math.min(1, p.rev) * 400) / 400;
+    if (r !== this._last.r) {
+      this._last.r = r;
+      this.revEl.style.setProperty('--r', r);
+    }
+    const c = Math.round(p.revCharge * 60) / 60;
+    if (c !== this._last.c) {
+      this._last.c = c;
+      this.revEl.style.setProperty('--c', c);
+    }
+    const z = p.revZone();
+    const full = p.revCharge >= 0.999;
+    const key = z + (full ? '+' : '');
+    if (key === this._last.rz) return;
+    this._last.rz = key;
+    this.revEl.className = 'hud-rev on z-' + z + (full ? ' full' : '');
+    if (z === 'red') this.revTip.textContent = 'ПЕРЕГАЗОВКА! Отпусти газ';
+    else if (full) this.revTip.textContent = 'ГОТОВО! Держи до старта';
+    else this.revTip.innerHTML = this.revTipBase;
+  }
+
+  /** Итог старта на шкале; через секунду шкала гаснет. */
+  launchResult(res) {
+    const txt = { perfect: 'СУПЕРСТАРТ!', good: 'ХОРОШИЙ СТАРТ', spin: 'ПРОБУКСОВКА!' }[res] || '';
+    this.revEl.className = 'hud-rev on res-' + res;
+    this.revTip.textContent = txt;
+    this.revResT = txt ? 1.0 : 0.25; // обычный старт — шкала просто гаснет
   }
 
   /** Короткая реакция (буст, трюк, попадание) у спидометра — сбоку, не поверх дороги. */
@@ -284,6 +351,26 @@ export class Hud {
   update(race, dt) {
     const p = race.player;
     if (this.touchEnabled && this.ui.game.input.lastDevice === 'gamepad') this.setTouch(false);
+    // шкала оборотов — только на отсчёте; после старта показывает итог и гаснет
+    const counting = race.state === 'countdown' && !race.playerIsBot;
+    if (counting !== !!this._last.counting) {
+      this._last.counting = counting;
+      this.el.classList.toggle('counting', counting);
+      if (counting) this._revStart();
+    }
+    if (counting) this._revUpdate(p);
+    else if (this.revResT > 0 && (this.revResT -= dt) <= 0) this.revEl.classList.remove('on');
+    // подсказка внизу — там же, где шкала: пока шкала на экране, подсказку прячем (её таймер идёт дальше)
+    const busy = counting || this.revResT > 0;
+    if (busy !== !!this._last.revBusy) {
+      this._last.revBusy = busy;
+      this.el.classList.toggle('rev-busy', busy);
+    }
+    const manual = this.touchEnabled && !this.ui.game.input.autoGas;
+    if (manual !== !!this._last.manual) {
+      this._last.manual = manual;
+      this.el.classList.toggle('manual-gas', manual); // автогаз выключен — кнопка ГАЗ и в гонке
+    }
     // время и круг
     const lap = Math.max(1, Math.min(race.laps, p.lapsDone + 1));
     if (this._last.lap !== lap) {

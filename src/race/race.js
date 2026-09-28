@@ -9,6 +9,7 @@ import { DRIFT_COLORS } from '../world/fx.js';
 
 const SUBSTEP = 1 / 120;
 const SMOKE = new THREE.Color(0xe8e4f0);
+const EXHAUST = new THREE.Color(0xb4b2c4);
 const INTRO_TIME = 4.3;
 const COUNT_TIME = 3.0;
 
@@ -93,7 +94,7 @@ export class Race {
     this.updateOrder();
     this.syncViews(0);
     this.lastPlace = this.player.place;
-    this.rocket = { pressedAt: -1, stalled: false };
+    for (const k of this.karts) k.onGrid = !this.demo; // до старта обороты — от газа, а не от скорости
     this.lightsStage = 0;
     if (this.skipIntro) {
       this.state = 'countdown';
@@ -126,30 +127,22 @@ export class Race {
         if (stage <= 3) this.emitGlobal('countdown', { n: 4 - stage });
         this.world.startGate?.setLights(stage);
       }
-      // ракетный старт: газ в последние ~0.6 с до старта; раньше — "захлёб"
-      if (input.throttle > 0.5 && this.rocket.pressedAt < 0) this.rocket.pressedAt = this.stateTime;
+      // газ на отсчёте: карты стоят, моторы раскручиваются — стрелку оборотов держат в зелёной зоне
+      for (const k of this.karts) {
+        const bd = this.bots.get(k);
+        const thr = bd ? bd.revThrottle(dt, this) : k === this.player ? input.throttle : 0;
+        k.revOnGrid(dt, thr);
+      }
       if (this.stateTime >= COUNT_TIME) {
         this.state = 'racing';
         this.stateTime = 0;
         this.world.startGate?.setLights(4);
         this.emitGlobal('go');
-        const p = this.rocket.pressedAt;
-        if (p >= COUNT_TIME - 0.75 && p < COUNT_TIME) {
-          this.player.addBoost(1.3, 1.32, 'rocket');
-          this.emitGlobal('rocketStart');
-        } else if (p >= 0 && p < COUNT_TIME - 1.5) {
-          this.rocket.stalled = true;
-          this.player.spinTimer = 0;
-          this.player.frozenTimer = 0.6;
-          this.emitGlobal('stall');
-        }
+        // суперстарт / хороший старт / пробуксовка — по заряду и стрелке (событие 'launch' у каждого карта)
         for (const k of this.karts) {
-          if (k.isPlayer) continue;
-          const bd = this.bots.get(k);
-          if (bd && this.rnd() < 0.2 + 0.5 * bd.skill) k.addBoost(1.1, 1.28, 'rocket');
+          k.launch();
           k.lapStart = 0;
         }
-        this.player.lapStart = 0;
       }
     }
 
@@ -353,6 +346,17 @@ export class Race {
         for (const ep of v.exhaustPoints) {
           wp.copy(ep).applyMatrix4(v.root.matrixWorld);
           this.fx.flame(wp, { x: -f.x, z: -f.z }, col, sc);
+        }
+      }
+      // старт: перегазовка — дым из выхлопа (на отсечке клубами), пробуксовка — дым из-под задних колёс
+      if (k.onGrid && k.rev > 0.35 && Math.random() < (k.rev - 0.35) * 0.3 + (k.revLimit > 0 ? 0.3 : 0)) {
+        wp.copy(v.exhaustPoints[Math.random() < 0.5 ? 0 : 1]).applyMatrix4(v.root.matrixWorld);
+        this.fx.dust(wp, EXHAUST, 0.25 + k.rev * 0.35);
+      }
+      if (k.launchSpin > 0 && !k.airborne) {
+        for (const sp of v.sparkPoints) {
+          wp.copy(sp).applyMatrix4(v.root.matrixWorld);
+          this.fx.dust(wp, SMOKE, 0.9);
         }
       }
       // пыль на бездорожье

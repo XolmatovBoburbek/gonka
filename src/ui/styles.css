@@ -1150,6 +1150,149 @@ kbd {
   opacity: 1;
   transform: translateY(0);
 }
+/* шкала оборотов на старте: полоски-светодиоды, зелёная зона — где держать стрелку, под ней — заряд старта */
+.hud-rev {
+  --r: 0;
+  --c: 0;
+  position: absolute;
+  left: 50%;
+  bottom: max(9%, 44px);
+  width: min(500px, 64vw);
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+  transition: opacity 0.25s, transform 0.25s;
+  text-align: center;
+  pointer-events: none;
+}
+.hud-rev.on {
+  opacity: 1;
+  transform: translateX(-50%);
+}
+.hud.rev-busy .hint {
+  opacity: 0;
+}
+.rev-tip {
+  margin-bottom: 9px;
+  font-family: var(--font);
+  font-weight: 900;
+  font-size: clamp(13px, 1.6vw, 18px);
+  white-space: nowrap;
+  text-shadow: 2px 2px 0 var(--ink), 0 0 8px rgba(20, 10, 36, 0.8);
+}
+.rev-tip kbd {
+  font-size: 12px;
+  padding: 0 6px;
+  vertical-align: 1px;
+}
+.rev-tip .g {
+  color: #5dffa0;
+}
+.rev-bar {
+  position: relative;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(20, 10, 36, 0.72);
+  box-shadow: 0 0 0 3px var(--ink), 0 0 0 5px rgba(255, 255, 255, 0.85);
+  transform: skewX(-12deg);
+}
+.rev-seg {
+  position: absolute;
+  inset: 5px 6px;
+  background: linear-gradient(
+    90deg,
+    #9fb2ff calc(var(--zg) * 100%),
+    #ffd23f 0 calc(var(--zp) * 100%),
+    #3dff8f 0 calc(var(--zt) * 100%),
+    #ffd23f 0 calc(var(--zr) * 100%),
+    #ff3d55 0
+  );
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(100% / 40 - 3px), transparent 0 calc(100% / 40));
+  mask: repeating-linear-gradient(90deg, #000 0 calc(100% / 40 - 3px), transparent 0 calc(100% / 40));
+}
+.rev-off {
+  opacity: 0.22;
+}
+.rev-on {
+  clip-path: inset(0 calc(100% - var(--r) * 100%) 0 0);
+}
+.rev-zone {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  left: calc(6px + (100% - 12px) * var(--zp));
+  width: calc((100% - 12px) * (var(--zt) - var(--zp)));
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px #3dff8f, 0 0 calc(6px + var(--c) * 22px) rgba(61, 255, 143, calc(0.35 + var(--c) * 0.65));
+}
+/* заряд: наливается, пока стрелка в зелёной зоне */
+.rev-zone i {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: -12px;
+  height: 5px;
+  border-radius: 3px;
+  background: #b9ffd4;
+  box-shadow: 0 0 8px #3dff8f;
+  transform-origin: left;
+  transform: scaleX(var(--c));
+}
+.rev-needle {
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  left: 6px;
+  right: 6px;
+  transform: translateX(calc(var(--r) * 100%));
+}
+.rev-needle i {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--ink), 0 0 10px #fff;
+}
+.hud-rev.z-red .rev-bar {
+  box-shadow: 0 0 0 3px var(--ink), 0 0 0 5px #ff3d55, 0 0 20px #ff3d55;
+}
+.hud-rev.z-red .rev-tip {
+  color: #ff6a78;
+  animation: revWarn 0.3s steps(2) infinite;
+}
+@keyframes revWarn {
+  to {
+    color: #fff;
+  }
+}
+.hud-rev.full .rev-tip {
+  color: #5dffa0;
+}
+.hud-rev.full .rev-zone {
+  animation: zonePulse 0.4s ease-in-out infinite alternate;
+}
+@keyframes zonePulse {
+  to {
+    box-shadow: 0 0 0 4px #b9ffd4, 0 0 34px #3dff8f;
+  }
+}
+.hud-rev[class*='res-'] .rev-tip {
+  font-family: var(--font-d);
+  font-weight: 400;
+  font-size: clamp(22px, 2.8vw, 34px);
+  transform: skewX(-10deg);
+}
+.hud-rev.res-perfect .rev-tip {
+  color: #ffb54a;
+}
+.hud-rev.res-good .rev-tip {
+  color: #7fd0ff;
+}
+.hud-rev.res-spin .rev-tip {
+  color: #ff6a78;
+}
 .hud-intro {
   position: absolute;
   left: 0;
@@ -1243,6 +1386,59 @@ kbd {
   width: 66px;
   height: 66px;
   font-size: 11px;
+}
+.t-gas {
+  display: none;
+}
+/* отсчёт: вместо кнопок действий — большая педаль газа */
+.hud.touch-on.counting .t-right .tb:not(.t-gas) {
+  visibility: hidden;
+}
+.hud.touch-on.counting .t-gas {
+  display: block;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 128px;
+  height: 128px;
+  font-size: 22px;
+  background: rgba(30, 160, 90, 0.5);
+  box-shadow: 0 0 0 4px #fff, 0 0 18px #3dff8f;
+  animation: gasPulse 0.8s ease-in-out infinite alternate;
+}
+.hud.touch-on.counting .t-gas.on {
+  background: rgba(61, 255, 143, 0.8);
+  animation: none;
+}
+@keyframes gasPulse {
+  to {
+    box-shadow: 0 0 0 4px #fff, 0 0 30px #3dff8f;
+  }
+}
+/* автогаз выключен — газ отдельной кнопкой и в гонке */
+.hud.touch-on.manual-gas:not(.counting) .t-gas {
+  display: block;
+  right: calc(max(16px, env(safe-area-inset-right)) + 212px);
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 92px;
+  height: 92px;
+  font-size: 15px;
+}
+.hud.touch-on .hud-rev {
+  bottom: max(20px, env(safe-area-inset-bottom));
+  width: max(200px, min(420px, calc(100vw - 440px)));
+}
+.hud.touch-on .rev-tip {
+  font-size: 13px;
+  white-space: normal;
+}
+.hud.touch-on .hud-rev[class*='res-'] .rev-tip {
+  font-size: 22px;
+}
+@media (orientation: portrait) {
+  .hud.touch-on .hud-rev {
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 160px);
+    width: calc(100vw - 48px);
+  }
 }
 .t-pause {
   top: 12px;

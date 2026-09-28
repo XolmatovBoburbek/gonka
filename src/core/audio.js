@@ -2849,8 +2849,189 @@ function miniTurbo(S, o, t, p, level) {
   return len + 0.2;
 }
 
+// ---------------------------------------------------------------------------
+// Kart engine. A looped buffer of exhaust pulses (one per firing, with cycle-to-cycle variation) plays at a
+// rate proportional to rpm and excites two "exhaust pipes" — feedback delay loops of fixed length. Their
+// resonances stay put while the firing harmonics sweep through them, so revving "wahs" like a real exhaust.
+// Throttle (load) sets the drive into a soft saturator and the brightness; the rev limiter chops the output.
+// ---------------------------------------------------------------------------
+
+const ENGINE_PULSE_HZ = 50; // firing rate of the pulse buffer at playbackRate 1
+const ENGINE_IDLE_HZ = 32; // firing rate at rpm 0 (idle)...
+const ENGINE_MAX_HZ = 200; // ...and at rpm 1 (limiter) — a small two-stroke single
+const ENGINE_LEVEL = 0.24; // loudness of the player's engine voice (rivals: ×0.5, scaled by distance)
+
+/** 64 firings: a sharp exhaust puff, the rarefaction dip after it, turbulence and a little ring. */
+function makeEnginePulses(ctx, seed) {
+  const sr = ctx.sampleRate;
+  const n = 64;
+  const period = sr / ENGINE_PULSE_HZ;
+  const len = Math.round(period * n);
+  const buf = ctx.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  let s = seed >>> 0 || 1;
+  const rand = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const W = Math.floor(period * 0.8);
+  for (let i = 0; i < n; i++) {
+    const t0 = Math.round(i * period + (rand() - 0.5) * period * 0.05);
+    let amp = (0.8 + rand() * 0.32) * (i % 2 ? 0.9 : 1);
+    if (rand() < 0.03) amp *= 0.35; // a rare weak firing keeps the idle alive
+    const ring = 650 + rand() * 550;
+    for (let j = 0; j < W; j++) {
+      const t = j / sr;
+      const puff = (1 - Math.exp(-t / 0.00018)) * Math.exp(-t / 0.0022);
+      const dip = -0.4 * (1 - Math.exp(-t / 0.002)) * Math.exp(-t / 0.0065);
+      const turb = (rand() * 2 - 1) * 0.28 * Math.exp(-t / 0.0024);
+      const tone = 0.1 * Math.sin(2 * Math.PI * ring * t) * Math.exp(-t / 0.002);
+      d[(t0 + j + len) % len] += amp * (puff + dip + turb + tone);
+    }
+  }
+  let mean = 0;
+  for (let i = 0; i < len; i++) mean += d[i];
+  mean /= len;
+  let peak = 0;
+  for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs((d[i] -= mean)));
+  const g = 0.9 / (peak || 1);
+  for (let i = 0; i < len; i++) d[i] *= g;
+  return buf;
+}
+
+function enginePulses(S, seed) {
+  if (!S.enginePulses) S.enginePulses = new Map();
+  let b = S.enginePulses.get(seed);
+  if (!b) S.enginePulses.set(seed, (b = makeEnginePulses(S.ctx, seed)));
+  return b;
+}
+
+let engineCurve = null;
+function engineShaperCurve() {
+  if (engineCurve) return engineCurve;
+  const n = 2048;
+  engineCurve = new Float32Array(n);
+  const k = Math.tanh(1.6);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    engineCurve[i] = Math.tanh(1.6 * x) / k;
+  }
+  return engineCurve;
+}
+
+/** Exhaust pipe: a feedback delay loop with damping — a comb of resonances at multiples of 1/delay. */
+function exhaustPipe(ctx, delay, fb, damp) {
+  const input = gainNode(ctx, 1);
+  const dl = ctx.createDelay(0.05);
+  dl.delayTime.value = delay;
+  const lp = biquad(ctx, 'lowpass', damp, 0.5);
+  const loop = gainNode(ctx, fb);
+  input.connect(dl);
+  dl.connect(lp);
+  lp.connect(loop);
+  loop.connect(dl);
+  return { input, output: lp, nodes: [input, dl, lp, loop] };
+}
+
+/**
+ * One engine voice → out. o: { seed, pipeA, pipeB, level, pan }. Returns the handle for setEngineCore.
+ * Voices differ by pulse seed and pipe lengths — the player's kart and the rivals don't sound identical.
+ */
+function createEngineCore(S, out, o = {}) {
+  const ctx = S.ctx;
+  const now = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = enginePulses(S, o.seed || 1);
+  src.loop = true;
+  src.playbackRate.value = ENGINE_IDLE_HZ / ENGINE_PULSE_HZ;
+  const pulses = gainNode(ctx, 1);
+  src.connect(pulses);
+  const pA = exhaustPipe(ctx, o.pipeA || 0.0046, 0.6, 2400);
+  const pB = exhaustPipe(ctx, o.pipeB || 0.0074, -0.5, 1600);
+  const mix = gainNode(ctx, 1);
+  const dry = gainNode(ctx, 0.45);
+  const wetA = gainNode(ctx, 0.55);
+  const wetB = gainNode(ctx, 0.5);
+  pulses.connect(dry).connect(mix);
+  pulses.connect(pA.input);
+  pulses.connect(pB.input);
+  pA.output.connect(wetA).connect(mix);
+  pB.output.connect(wetB).connect(mix);
+  // газ: сильнее в насыщение, ярче тон
+  const drive = gainNode(ctx, 0.6);
+  const shaper = ctx.createWaveShaper();
+  shaper.curve = engineShaperCurve();
+  const body = biquad(ctx, 'peaking', 95, 0.8);
+  body.gain.value = 4;
+  const tone = biquad(ctx, 'lowpass', 900, 0.7);
+  const hp = biquad(ctx, 'highpass', 30, 0.7);
+  mix.connect(drive).connect(shaper).connect(body).connect(tone).connect(hp);
+  // шум впуска, толчками в такт вспышкам
+  const n = noiseSrc(S, now);
+  const nbp = biquad(ctx, 'bandpass', 1800, 0.8);
+  const am = gainNode(ctx, 0.35);
+  const amDepth = gainNode(ctx, 1.1);
+  src.connect(amDepth).connect(am.gain);
+  const intake = gainNode(ctx, 0);
+  n.connect(nbp).connect(am).connect(intake).connect(body);
+  // отсечка: выход "рвётся" ~15 раз в секунду
+  const chop = gainNode(ctx, 1);
+  const lfo = osc(ctx, 'square', 15, now);
+  const limDepth = gainNode(ctx, 0);
+  lfo.connect(limDepth).connect(chop.gain);
+  const level = gainNode(ctx, 0);
+  hp.connect(chop).connect(level);
+  const nodes = [src, pulses, ...pA.nodes, ...pB.nodes, mix, dry, wetA, wetB, drive, shaper, body, tone, hp, n, nbp, am, amDepth, intake, chop, lfo, limDepth, level];
+  let head = level;
+  if (o.pan !== undefined) {
+    const p = stereo(ctx, o.pan);
+    if (p) {
+      level.connect(p);
+      head = p;
+      nodes.push(p);
+    }
+  }
+  head.connect(out);
+  src.start(now);
+  lfo.start(now);
+  return { src, drive, tone, intake, chop, limDepth, level, pan: head !== level ? head : null, base: o.level || 1, nodes, sources: [src, n, lfo], last: {} };
+}
+
+/** st: { rpm 0..1, load 0..1, limiter, gain, pan }. set(key, param, value, timeConstant). */
+function setEngineCore(c, st, set) {
+  const rpm = clamp(num(st.rpm, 0), 0, 1.05);
+  const load = clamp(num(st.load, 0), 0, 1);
+  const f = ENGINE_IDLE_HZ + (ENGINE_MAX_HZ - ENGINE_IDLE_HZ) * rpm;
+  const lim = !!st.limiter;
+  set('rate', c.src.playbackRate, f / ENGINE_PULSE_HZ, 0.02);
+  set('drive', c.drive.gain, 0.7 + 0.75 * load, 0.04);
+  set('tone', c.tone.frequency, 450 + 1500 * rpm + 3400 * load * (0.35 + 0.65 * rpm), 0.04);
+  set('intake', c.intake.gain, (0.015 + 0.09 * load) * (0.25 + 0.75 * rpm), 0.05);
+  set('lim', c.limDepth.gain, lim ? 0.42 : 0, 0.01);
+  set('chop', c.chop.gain, lim ? 0.58 : 1, 0.01);
+  set('lvl', c.level.gain, c.base * (0.72 + 0.28 * load) * (0.75 + 0.35 * rpm) * clamp(num(st.gain, 1), 0, 1), 0.05);
+  if (c.pan && st.pan !== undefined) set('pan', c.pan.pan, clamp(num(st.pan, 0), -1, 1), 0.08);
+}
+
+function stopEngineCore(c, now) {
+  try {
+    c.level.gain.cancelScheduledValues(now);
+    c.level.gain.setValueAtTime(c.level.gain.value, now);
+    c.level.gain.setTargetAtTime(0, now, 0.05);
+    for (const s of c.sources) s.stop(now + 0.4);
+    releaseOnEnd(c.src, c.nodes);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 // Each SFX: fn(S, out, t, pitch) -> duration in seconds; rev = reverb send; ui = UI sound
 const SFX = {
+  // хлопок в выхлопе при сбросе газа на высоких оборотах
+  backfire: {
+    fn(S, o, t, p) {
+      sNoise(S, o, t, { type: 'bandpass', f: 1100 * p, q: 0.9, a: 0.001, peak: 0.45, dur: 0.05 });
+      sTone(S, o, t, { type: 'sine', f: 130 * p, f1: 55, dur: 0.08, a: 0.002, peak: 0.4 });
+      return 0.15;
+    },
+  },
   countdown: {
     rev: 0.12,
     fn(S, o, t, p) {
@@ -3292,6 +3473,15 @@ export class AudioManager {
     renderDrumKit(ctx, (kit) => {
       if (kit && this.ctx === ctx) this._kit = kit;
     });
+    // импульсы вспышек моторов (свой и двух соперников) — заранее, а не в первом кадре отсчёта
+    setTimeout(() => {
+      if (this.ctx !== ctx) return;
+      try {
+        for (const seed of [7, 11, 17]) enginePulses(this.S, seed);
+      } catch (e) {
+        /* посчитаются при первом звуке мотора */
+      }
+    }, 300);
   }
 
   _warnOnce(key, msg, err) {
@@ -3447,7 +3637,8 @@ export class AudioManager {
     const pan = clamp(num(opts.pan, 0), -1, 1);
     const pitch = clamp(num(opts.pitch, 1), 0.25, 4);
     const ctx = this.ctx;
-    const t = ctx.currentTime + 0.005;
+    const delay = clamp(num(opts.delay, 0), 0, 2);
+    const t = ctx.currentTime + 0.005 + delay;
     const out = gainNode(ctx, volume * (SFX_TRIM[name] || 1));
     const nodes = [out];
     let head = out;
@@ -3481,7 +3672,7 @@ export class AudioManager {
           /* ignore */
         }
       }
-    }, (dur + 0.6) * 1000);
+    }, (dur + delay + 0.6) * 1000);
   }
 
   // ----- continuous player-kart sounds -------------------------------------
@@ -3491,31 +3682,11 @@ export class AudioManager {
     const S = this.S;
     const now = ctx.currentTime;
     const out = gainNode(ctx, 0);
-    out.gain.setTargetAtTime(1, now, 0.08);
+    out.gain.setTargetAtTime(1, now, 0.12); // мотор заводится плавно
     out.connect(this.engineBus);
 
-    // motor: saw + detuned square + sub sine → resonant low-pass → putter AM
-    const o1 = osc(ctx, 'sawtooth', 60, now);
-    const o2 = osc(ctx, 'square', 60, now);
-    o2.detune.value = 9;
-    const o3 = osc(ctx, 'sine', 30, now);
-    const g2 = gainNode(ctx, 0.3);
-    const g3 = gainNode(ctx, 0.55);
-    const lp = biquad(ctx, 'lowpass', 600, 2.2);
-    const am = gainNode(ctx, 0.75);
-    const putter = osc(ctx, 'sine', 14, now);
-    const putterDepth = gainNode(ctx, 0.25);
-    const wob = osc(ctx, 'sine', 6.3, now);
-    const wobDepth = gainNode(ctx, 0.8);
-    const motor = gainNode(ctx, 0);
-    o1.connect(lp);
-    o2.connect(g2).connect(lp);
-    o3.connect(g3).connect(lp);
-    lp.connect(am).connect(motor).connect(out);
-    putter.connect(putterDepth).connect(am.gain);
-    wob.connect(wobDepth);
-    wobDepth.connect(o1.frequency);
-    wobDepth.connect(o2.frequency);
+    // мотор: импульсы вспышек → выхлопные трубы → насыщение и тон от газа (см. createEngineCore)
+    const core = createEngineCore(S, out, { seed: 7, level: ENGINE_LEVEL });
 
     // boost jet: band-passed roaring noise
     const jn = noiseSrc(S, now);
@@ -3547,11 +3718,11 @@ export class AudioManager {
     rn.connect(gbp).connect(gravel).connect(trem);
     trem.connect(rumble).connect(out);
 
-    const sources = [o1, o2, o3, putter, wob, chat, rl];
+    const sources = [chat, rl];
     for (const s of sources) s.start(now);
     sources.push(jn, sn, rn);
-    const all = sources.concat([out, g2, g3, lp, am, putterDepth, wobDepth, motor, jhp, jbp, jet, sbp, chatDepth, screech, rlp, gbp, gravel, trem, rlDepth, rumble]);
-    return { out, o1, o2, o3, putter, wobDepth, lp, motor, jet, jbp, screech, sbp, rumble, rlp, sources, all, last: {}, lastT: -1, flags: '' };
+    const all = sources.concat([out, jhp, jbp, jet, sbp, chatDepth, screech, rlp, gbp, gravel, trem, rlDepth, rumble]);
+    return { out, core, jet, jbp, screech, sbp, rumble, rlp, sources, all, last: {}, lastT: -1, flags: '', load: 0, held: 0, heldPrev: 0, lastU: -1, lastPop: -9 };
   }
 
   _setP(e, key, param, value, tc, now) {
@@ -3561,6 +3732,10 @@ export class AudioManager {
     param.setTargetAtTime(value, now, tc);
   }
 
+  /**
+   * Звук мотора игрока. state: { rpm 0..1, load 0..1, limiter, speed01, throttle, boosting, drifting,
+   * driftLevel, offroad, airborne }. Без rpm обороты считаются по скорости (одна передача).
+   */
   updateEngine(state) {
     if (!state || !this._ready() || this.ctx.state !== 'running') return;
     try {
@@ -3571,8 +3746,9 @@ export class AudioManager {
       const drifting = !!state.drifting;
       const offroad = !!state.offroad;
       const air = !!state.airborne;
+      const lim = !!state.limiter;
       const lvl = clamp(num(state.driftLevel, 0) | 0, 0, 3);
-      const flags = '' + +boosting + +drifting + +offroad + +air + lvl;
+      const flags = '' + +boosting + +drifting + +offroad + +air + +lim + lvl;
       if (flags === e.flags && now - e.lastT < 0.03) return;
       e.flags = flags;
       e.lastT = now;
@@ -3580,22 +3756,20 @@ export class AudioManager {
       const sp = clamp(num(state.speed01, 0), 0, 1.8);
       const thr = clamp(num(state.throttle, 0), 0, 1);
       const sp1 = Math.min(sp, 1);
-
-      let f = 55 + 135 * Math.pow(sp1, 0.85) + Math.max(0, sp - 1) * 90;
-      f *= 1 + thr * 0.04;
-      if (boosting) f *= 1.12;
-      if (air) f *= 1.06 + 0.06 * thr;
-      f = clamp(f, 45, 320);
-      this._setP(e, 'f', e.o1.frequency, f, 0.06, now);
-      this._setP(e, 'f2', e.o2.frequency, f, 0.06, now);
-      this._setP(e, 'f3', e.o3.frequency, f * 0.5, 0.06, now);
-      this._setP(e, 'put', e.putter.frequency, f / 4.2, 0.06, now);
-      this._setP(e, 'wob', e.wobDepth.gain, f * 0.012, 0.1, now);
-      const cut = 380 + thr * 900 + sp1 * 1300 + (boosting ? 900 : 0) - (offroad ? 250 : 0);
-      this._setP(e, 'cut', e.lp.frequency, clamp(cut, 200, 5000), 0.07, now);
-      let mg = 0.042 + thr * 0.03 + sp1 * 0.02;
-      if (air) mg *= 0.85;
-      this._setP(e, 'mg', e.motor.gain, mg, 0.06, now);
+      const rpm = clamp(num(state.rpm, 0.06 + 0.8 * Math.min(sp, 1.2)), 0, 1.05);
+      const load = clamp(num(state.load, thr), 0, 1);
+      setEngineCore(e.core, { rpm, load, limiter: lim, gain: air ? 0.85 : 1 }, (k, p, v, tc) => this._setP(e.core, k, p, v, tc, now));
+      // хлопки в выхлопе: газ держали и резко сбросили на высоких оборотах (не на каждое короткое нажатие)
+      const dtu = e.lastU >= 0 ? Math.min(0.1, now - e.lastU) : 0;
+      e.lastU = now;
+      e.held = load > 0.5 ? e.held + dtu : 0;
+      if (e.load > 0.5 && load < 0.15 && rpm > 0.6 && e.heldPrev > 0.35 && now - e.lastPop > 1 && Math.random() < 0.8) {
+        e.lastPop = now;
+        const n = 1 + Math.floor(Math.random() * 2 * rpm);
+        for (let i = 0; i < n; i++) this.sfx('backfire', { volume: 0.35 + 0.4 * rpm, pitch: 0.85 + Math.random() * 0.35, delay: 0.03 + i * 0.08 + Math.random() * 0.05 });
+      }
+      e.heldPrev = e.held;
+      e.load = load;
 
       const jet = boosting ? 0.24 + 0.07 * Math.min(sp, 1.5) : 0;
       this._setP(e, 'jet', e.jet.gain, jet, boosting ? 0.04 : 0.15, now);
@@ -3613,13 +3787,39 @@ export class AudioManager {
     }
   }
 
+  /** Моторы соперников рядом: list — до двух { rpm, load, limiter, gain 0..1, pan -1..1 }. */
+  updateRivalEngines(list) {
+    if (!list || !this._ready() || this.ctx.state !== 'running') return;
+    try {
+      if (!this._rivals) this._rivals = [];
+      const now = this.ctx.currentTime;
+      for (let i = 0; i < 2; i++) {
+        const st = list[i];
+        let c = this._rivals[i];
+        const on = st && st.gain > 0.002;
+        if (!c && !on) continue;
+        if (!c) c = this._rivals[i] = createEngineCore(this.S, this.engineBus, { seed: 11 + i * 6, pipeA: i ? 0.0052 : 0.0041, pipeB: i ? 0.0067 : 0.0081, level: ENGINE_LEVEL * 0.5, pan: 0 });
+        if (now - (c.lastT || 0) < 0.03) continue;
+        c.lastT = now;
+        if (on) setEngineCore(c, st, (k, p, v, tc) => this._setP(c, k, p, v, tc, now));
+        else this._setP(c, 'lvl', c.level.gain, 0, 0.1, now);
+      }
+    } catch (err) {
+      this._warnOnce('rivals', 'AudioManager: rival engines update failed', err);
+    }
+  }
+
   stopEngine() {
     const e = this._engine;
-    if (!e) return;
+    const rivals = this._rivals;
     this._engine = null;
+    this._rivals = null;
     if (!this._ready()) return;
     const now = this.ctx.currentTime;
+    if (rivals) for (const c of rivals) if (c) stopEngineCore(c, now);
+    if (!e) return;
     try {
+      stopEngineCore(e.core, now);
       e.out.gain.cancelScheduledValues(now);
       e.out.gain.setValueAtTime(e.out.gain.value, now);
       e.out.gain.setTargetAtTime(0, now, 0.04);
