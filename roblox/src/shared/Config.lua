@@ -34,6 +34,11 @@ Config.Sounds = {
 		sunset = "",
 		momiji = "",
 		results = "",
+		-- финальный круг (темп ×1.07, плотнее аранжировка); если пусто — играет обычная тема чуть быстрее
+		sakura_final = "",
+		neon_final = "",
+		sunset_final = "",
+		momiji_final = "",
 	},
 	engine = {
 		loop = "",
@@ -82,9 +87,9 @@ Config.Sounds = {
 		uiStart = "",
 	},
 	-- частота вспышек в записанной петле мотора (Гц), чтобы считать PlaybackSpeed
-	engineLoopHz = 0,
-	engineIdleHz = 0,
-	engineLimiterHz = 0,
+	engineLoopHz = 112,
+	engineIdleHz = 32,
+	engineLimiterHz = 192,
 }
 
 return Config

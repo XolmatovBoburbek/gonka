@@ -494,6 +494,11 @@ Config.Sounds = {
 		sunset = "",
 		momiji = "",
 		results = "",
+		-- финальный круг (темп ×1.07, плотнее аранжировка); если пусто — играет обычная тема чуть быстрее
+		sakura_final = "",
+		neon_final = "",
+		sunset_final = "",
+		momiji_final = "",
 	},
 	engine = {
 		loop = "",
@@ -542,9 +547,9 @@ Config.Sounds = {
 		uiStart = "",
 	},
 	-- частота вспышек в записанной петле мотора (Гц), чтобы считать PlaybackSpeed
-	engineLoopHz = 0,
-	engineIdleHz = 0,
-	engineLimiterHz = 0,
+	engineLoopHz = 112,
+	engineIdleHz = 32,
+	engineLimiterHz = 192,
 }
 
 return Config
@@ -8508,7 +8513,12 @@ Input.touch = touch
 
 local function anyDown(list: { Enum.KeyCode }): boolean
 	for _, k in list do
-		if UserInputService:IsKeyDown(k) then
+		local isPad = string.sub(k.Name, 1, 6) == "Button"
+		if isPad then
+			if UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, k) then
+				return true
+			end
+		elseif UserInputService:IsKeyDown(k) then
 			return true
 		end
 	end
@@ -8557,7 +8567,6 @@ end)
 --- Снять состояние за кадр: { steer, throttle, brake, driftHeld, driftPressed, item, boost }.
 function Input.read()
 	if UserInputService:GetFocusedTextBox() then
-		table.clear(edges)
 		edges.drift, edges.item, edges.boost = false, false, false
 		return { steer = 0, throttle = 0, brake = 0, driftHeld = false, driftPressed = false, item = false, boost = false }
 	end
@@ -9240,7 +9249,12 @@ local function handleKartEvents(k)
 				if k.lapsDone == R.laps - 1 then
 					Hud.big("ФИНАЛЬНЫЙ КРУГ!", Color3.fromRGB(255, 80, 120), 1.6)
 					Audio.sfx("finalLap", 1)
-					Audio.setMusicSpeed(1.06)
+					local fk = R.track.data.music .. "_final"
+					if (Config.Sounds.music :: any)[fk] and (Config.Sounds.music :: any)[fk] ~= "" then
+						Audio.playMusic(fk)
+					else
+						Audio.setMusicSpeed(1.06)
+					end
 				else
 					Hud.callout(string.format("КРУГ %d/%d", k.lapsDone + 1, R.laps), Color3.fromRGB(57, 243, 255))
 					Audio.sfx("lap", 0.9)

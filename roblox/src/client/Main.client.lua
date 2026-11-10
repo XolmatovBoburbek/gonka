@@ -345,7 +345,12 @@ local function handleKartEvents(k)
 				if k.lapsDone == R.laps - 1 then
 					Hud.big("ФИНАЛЬНЫЙ КРУГ!", Color3.fromRGB(255, 80, 120), 1.6)
 					Audio.sfx("finalLap", 1)
-					Audio.setMusicSpeed(1.06)
+					local fk = R.track.data.music .. "_final"
+					if (Config.Sounds.music :: any)[fk] and (Config.Sounds.music :: any)[fk] ~= "" then
+						Audio.playMusic(fk)
+					else
+						Audio.setMusicSpeed(1.06)
+					end
 				else
 					Hud.callout(string.format("КРУГ %d/%d", k.lapsDone + 1, R.laps), Color3.fromRGB(57, 243, 255))
 					Audio.sfx("lap", 0.9)
