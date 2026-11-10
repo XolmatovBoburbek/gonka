@@ -44,6 +44,13 @@ export const PHYS = {
   launchPerfect: [1.2, 1.32],
   launchGood: [0.7, 1.2],
   launchSpin: 0.7, // пробуксовка после старта на отсечке, с
+  // монеты: каждая в запасе — +1% к максимальной скорости, попадание выбивает три
+  coinMax: 10,
+  coinSpeed: 0.01,
+  coinLoss: 3,
+  // слипстрим: столько секунд держаться в воздушном мешке за соперником — и рывок
+  draftTime: 1.4,
+  draftBoost: [1.3, 1.16],
 };
 
 const _tmp = new THREE.Vector3();
@@ -80,6 +87,10 @@ export class Kart {
     this.boosts = [];
     this.boost = { time: 0, power: 1, kind: '', stack: 0 };
     this.boostMeter = 0; // 0..3 деления
+    this.coins = 0; // запас монет (скорость)
+    this.coinsTotal = 0; // собрано за гонку (в кошелёк)
+    this.draft = 0; // сколько секунд едет в воздушном мешке
+    this.draftCd = 0;
     // мотор: rev — обороты 0..1 (0 — холостые, 1 — отсечка). На старте их держат газом (onGrid),
     // в гонке они идут от скорости колёс
     this.onGrid = false;
@@ -207,6 +218,11 @@ export class Kart {
     this.lastHitBy = by;
     this.cancelDrift();
     this.clearBoosts();
+    const lost = Math.min(this.coins, PHYS.coinLoss);
+    if (lost) {
+      this.coins -= lost;
+      this.emit('coinLoss', { n: lost });
+    }
     if (kind === 'freeze') {
       this.frozenTimer = 1.5;
       this.invuln = 2.6;
@@ -249,6 +265,12 @@ export class Kart {
     this.addBoost(t, p, 'boost' + n);
     this.emit('boostFire', { level: n });
     return true;
+  }
+
+  addCoin() {
+    this.coinsTotal++;
+    if (this.coins < PHYS.coinMax) this.coins++;
+    this.emit('coin');
   }
 
   /** Зона стрелки оборотов: 'low' | 'good' | 'perfect' | 'red'. */
@@ -379,7 +401,7 @@ export class Kart {
 
     const d = this.drift;
     const boosting = this.boost.time > 0;
-    const vmaxBase = P.maxSpeed * this.speedF * this.rubber * this.botSpeed;
+    const vmaxBase = P.maxSpeed * this.speedF * this.rubber * this.botSpeed * (1 + P.coinSpeed * this.coins);
     let vmax = vmaxBase;
     if (this.offroad && !boosting) vmax *= P.offroadFactor;
     if (boosting) vmax = vmaxBase * this.boost.power;

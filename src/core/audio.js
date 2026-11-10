@@ -3024,6 +3024,14 @@ function stopEngineCore(c, now) {
 
 // Each SFX: fn(S, out, t, pitch) -> duration in seconds; rev = reverb send; ui = UI sound
 const SFX = {
+  coin: {
+    rev: 0.15,
+    fn(S, o, t, p) {
+      synthBell(S, o, t, 1976 * p, 0.12, 0.18, 2);
+      synthBell(S, o, t + 0.055, 2637 * p, 0.14, 0.3, 2);
+      return 0.45;
+    },
+  },
   // хлопок в выхлопе при сбросе газа на высоких оборотах
   backfire: {
     fn(S, o, t, p) {

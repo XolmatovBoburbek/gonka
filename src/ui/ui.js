@@ -5,6 +5,7 @@ import { CHARACTERS } from '../data/characters.js';
 import { TRACKS } from '../tracks/index.js';
 import { renderPortrait } from '../race/kartModel.js';
 import { DIFFICULTY } from '../race/ai.js';
+import { CHAR_PRICES } from '../data/progress.js';
 import { QUALITY_PRESETS } from '../core/renderer.js';
 
 const TIPS = [
@@ -17,6 +18,9 @@ const TIPS = [
   'Бустеры на дороге дают ускорение и не замедляются на траве.',
   'Ускорения складываются: Турбо на бустере — почти вдвое быстрее, а с бустом из шкалы — ровно ×2!',
   'Отстающим чаще выпадают Турбо и Звёздные сферы.',
+  'Монеты на трассе: каждая в запасе (до 10) — +1% к скорости. Попадание выбивает три!',
+  'Слипстрим: подержись прямо за соперником полторы секунды — получишь рывок для обгона.',
+  'Монеты из гонок копятся в кошельке — за них открываются новые гонщики. В Гран-при дают ещё и за кубок.',
 ];
 
 export class UI {
@@ -37,13 +41,14 @@ export class UI {
             <button class="btn focusable" data-act="settings">НАСТРОЙКИ</button>
           </div>
         </div>
-        <div class="title-foot">8 гонщиков · 4 локации · Турбо, Сфера, Барьер и Лёд · Enter — играть</div>
+        <div class="title-foot">8 гонщиков · 4 локации · Гран-при · монеты и слипстрим · Enter — играть</div>
       </div>
 
       <div class="screen select-screen" data-screen="select">
         <div class="sel-head">
           <button class="btn small back focusable" data-act="back">← НАЗАД</button>
           <h2>ВЫБОР ГОНЩИКА</h2>
+          <div class="wallet" title="Монеты: собирай на трассе, получай за места и кубки"><i class="coin"></i><b class="wallet-n">0</b></div>
         </div>
         <div class="sel-body">
           <div class="chars"></div>
@@ -56,11 +61,13 @@ export class UI {
               <div class="stat"><span>Ускорение</span><div class="bar"><i data-s="accel"></i></div></div>
               <div class="stat"><span>Управление</span><div class="bar"><i data-s="handling"></i></div></div>
             </div>
+            <button class="btn small unlock focusable" data-act="unlock"></button>
           </div>
         </div>
         <div class="sel-bottom">
           <div class="tracks"></div>
           <div class="opts">
+            <div class="opt"><span class="opt-l">Режим</span><div class="seg mode"></div></div>
             <div class="opt"><span class="opt-l">Соперники</span><div class="seg diff"></div></div>
             <div class="opt"><span class="opt-l">Круги</span><div class="seg laps"></div></div>
             <button class="btn primary go focusable" data-act="start">СТАРТ!</button>
@@ -82,9 +89,11 @@ export class UI {
         <div class="panel wide">
           <div class="res-head"><div class="res-place"></div><div class="res-sub"></div><div class="res-record"></div></div>
           <table class="res-table"><tbody></tbody></table>
+          <div class="res-reward"></div>
           <div class="res-btns">
-            <button class="btn primary focusable" data-act="restart">ЕЩЁ РАЗ</button>
-            <button class="btn focusable" data-act="play">ДРУГАЯ ТРАССА</button>
+            <button class="btn primary focusable only-gp" data-act="gpnext">ДАЛЕЕ</button>
+            <button class="btn primary focusable only-single" data-act="restart">ЕЩЁ РАЗ</button>
+            <button class="btn focusable only-single only-final" data-act="play">К ВЫБОРУ</button>
             <button class="btn focusable" data-act="menu">В МЕНЮ</button>
           </div>
         </div>
@@ -187,6 +196,7 @@ export class UI {
     switch (act) {
       case 'play':
         g.audio.sfx('uiSelect');
+        g.gp = null;
         if (g.state === 'race') {
           g.state = 'menu';
           g.ui.hud.show(false);
@@ -214,9 +224,33 @@ export class UI {
         this.closeModal();
         break;
       case 'start':
+        if (!g.isUnlocked(g.settings.character)) {
+          g.audio.sfx('uiBack');
+          break;
+        }
         g.audio.sfx('uiStart');
         g.saveSettings();
-        g.startRace();
+        if (g.settings.mode === 'gp') g.startGP();
+        else {
+          g.gp = null;
+          g.startRace();
+        }
+        break;
+      case 'unlock':
+        if (g.unlockChar(g.settings.character)) {
+          g.audio.sfx('finishWin');
+          g.saveSettings();
+        } else g.audio.sfx('uiBack');
+        this.refreshSelect();
+        break;
+      case 'gpnext':
+        g.audio.sfx('uiStart');
+        if (this._gpFinal) {
+          // после последней гонки — итоговая таблица кубка
+          const f = this._gpFinal;
+          this._gpFinal = null;
+          this.showGpFinal(f);
+        } else g.nextGPRace();
         break;
       case 'resume':
         g.audio.sfx('uiSelect');
@@ -298,7 +332,7 @@ export class UI {
     const chars = this.$('.chars');
     chars.innerHTML = CHARACTERS.map(
       (c) => `<button class="char focusable" data-id="${c.id}" style="--c1:${c.kart};--c2:${c.hair}">
-        <div class="portrait"></div><div class="cname">${c.name}</div></button>`
+        <div class="portrait"></div><div class="cname">${c.name}</div>${CHAR_PRICES[c.id] ? `<div class="lock"><i class="coin"></i>${CHAR_PRICES[c.id]}</div>` : ''}</button>`
     ).join('');
     chars.addEventListener('click', (e) => {
       const b = e.target.closest('.char');
@@ -315,7 +349,16 @@ export class UI {
     ).join('');
     tracks.addEventListener('click', (e) => {
       const b = e.target.closest('.track');
-      if (b) this.pickTrack(b.dataset.id);
+      if (b && g.settings.mode !== 'gp') this.pickTrack(b.dataset.id);
+    });
+    const mode = this.$('.seg.mode');
+    mode.innerHTML = `<button class="focusable" data-v="single">Гонка</button><button class="focusable" data-v="gp">Гран-при</button>`;
+    mode.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      g.settings.mode = b.dataset.v;
+      g.audio.sfx('uiMove');
+      this.refreshSelect();
     });
     const diff = this.$('.seg.diff');
     diff.innerHTML = Object.values(DIFFICULTY)
@@ -374,7 +417,29 @@ export class UI {
     const g = this.game;
     this.ensurePortraits();
     const s = g.settings;
-    this.root.querySelectorAll('.char').forEach((b) => b.classList.toggle('sel', b.dataset.id === s.character));
+    const gpMode = s.mode === 'gp';
+    this.root.querySelector('.select-screen').classList.toggle('gp-mode', gpMode);
+    this.$('.wallet-n').textContent = g.profile.coins;
+    this.root.querySelectorAll('.seg.mode button').forEach((b) => b.classList.toggle('sel', b.dataset.v === (gpMode ? 'gp' : 'single')));
+    this.root.querySelectorAll('.char').forEach((b) => {
+      b.classList.toggle('sel', b.dataset.id === s.character);
+      b.classList.toggle('locked', !g.isUnlocked(b.dataset.id));
+    });
+    // закрытый гонщик: вместо старта — кнопка "открыть" (или сколько монет не хватает)
+    const locked = !g.isUnlocked(s.character);
+    const price = CHAR_PRICES[s.character] || 0;
+    const ub = this.$('.btn.unlock');
+    ub.style.display = locked ? '' : 'none';
+    ub.disabled = locked && g.profile.coins < price;
+    ub.innerHTML = g.profile.coins >= price ? `ОТКРЫТЬ ЗА <i class="coin"></i>${price}` : `НУЖНО <i class="coin"></i>${price} · не хватает ${price - g.profile.coins}`;
+    const go = this.$('.btn.go');
+    go.disabled = locked;
+    const cup = g.profile.cups[s.difficulty];
+    go.textContent = locked ? 'ГОНЩИК ЗАКРЫТ' : gpMode ? 'ГРАН-ПРИ!' : 'СТАРТ!';
+    this.root.querySelectorAll('.track').forEach((b, i) => {
+      b.dataset.n = i + 1;
+    });
+    this.root.querySelector('.tracks').dataset.cup = gpMode && cup && cup <= 3 ? ['', '🥇 Кубок взят', '🥈 Лучшее: 2-е место', '🥉 Лучшее: 3-е место'][cup] : '';
     this.root.querySelectorAll('.track').forEach((b) => {
       b.classList.toggle('sel', b.dataset.id === s.track);
       const rec = g.records[g.recordKey(b.dataset.id, s.laps)];
@@ -463,10 +528,35 @@ export class UI {
     }
   }
 
-  showResults(results, player, record = null) {
+  /** Итоговая таблица Гран-при: общий зачёт, кубок и награда. */
+  showGpFinal(f) {
+    const place = f.cupPlace;
+    const head = this.$('.res-place');
+    head.textContent = place === 1 ? 'КУБОК ТВОЙ!' : `ГРАН-ПРИ: ${place}-е место`;
+    head.dataset.place = place <= 3 ? place : 'n';
+    this.$('.res-sub').textContent = place === 1 ? 'Золотой кубок Sakura Drift!' : place <= 3 ? 'Ты на пьедестале Гран-при!' : 'В следующий раз кубок будет твоим!';
+    this.$('.res-record').innerHTML = '';
+    this.$('.res-table tbody').innerHTML = f.standings
+      .map((r, i) => {
+        const p = this.portraits[r.char.id];
+        return `<tr class="${r.me ? 'me' : ''}" style="--c1:${r.char.kart};animation-delay:${i * 0.07}s">
+          <td class="rp">${i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</td>
+          <td class="rimg"><div class="mini" style="${p ? `background-image:url(${p})` : ''}"></div></td>
+          <td class="rn">${r.char.name}${r.me ? ' <span class="you">ТЫ</span>' : ''}</td>
+          <td class="rt">${r.total} очк.</td><td class="rb"></td></tr>`;
+      })
+      .join('');
+    this.$('.res-reward').innerHTML = f.cupBonus ? `Награда за кубок: <i class="coin"></i><b>+${f.cupBonus}</b> · в кошельке <i class="coin"></i><b>${this.game.profile.coins}</b>` : `В кошельке <i class="coin"></i><b>${this.game.profile.coins}</b>`;
+    this.root.querySelector('.results-screen').dataset.mode = 'final';
+    if (place <= 3) this.game.audio.sfx('finishWin');
+    this.showScreen('results');
+  }
+
+  showResults(results, player, record = null, reward = null) {
     this.ensurePortraits();
     const idx = results.findIndex((r) => r.kart === player);
     const place = idx + 1;
+    const gp = reward && reward.gp;
     const head = this.$('.res-place');
     head.textContent = place === 1 ? '1-е МЕСТО!' : `${place}-е место`;
     head.dataset.place = place <= 3 ? place : 'n';
@@ -491,10 +581,14 @@ export class UI {
           <td class="rimg"><div class="mini" style="${p ? `background-image:url(${p})` : ''}"></div></td>
           <td class="rn">${r.char.name}${me ? ' <span class="you">ТЫ</span>' : ''}</td>
           <td class="rt">${r.finished ? fmtTime(r.time) : '<span class="muted">' + fmtTime(r.time) + '</span>'}</td>
-          <td class="rb">${r.best ? 'лучший ' + fmtTime(r.best) : ''}</td></tr>`;
+          <td class="rb">${gp ? `<b class="pts">+${gp.gain[r.char.id]}</b> · ${gp.points[r.char.id]} очк.` : r.best ? 'лучший ' + fmtTime(r.best) : ''}</td></tr>`;
       })
       .join('');
     this.$('.res-table tbody').innerHTML = rows;
+    if (gp) sub.textContent = `Гран-при · гонка ${gp.race} из ${gp.races} · ты ${gp.cupPlace}-й в общем зачёте`;
+    this.$('.res-reward').innerHTML = reward ? `<i class="coin"></i><b>+${reward.collected + reward.placeBonus}</b> монет: собрано ${reward.collected} + за место ${reward.placeBonus}` : '';
+    this.root.querySelector('.results-screen').dataset.mode = gp ? 'gp' : 'single';
+    this._gpFinal = gp && gp.final ? { ...gp, cupBonus: reward.cupBonus } : null;
     this.hud.show(false);
     this.showScreen('results');
   }

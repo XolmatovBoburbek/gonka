@@ -4,6 +4,7 @@ import { Kart, PHYS } from './kart.js';
 import { KartView } from './kartModel.js';
 import { BotDriver, DIFFICULTY } from './ai.js';
 import { ItemSystem } from './items.js';
+import { CoinSystem } from './coins.js';
 import { CHARACTERS } from '../data/characters.js';
 import { DRIFT_COLORS } from '../world/fx.js';
 
@@ -58,6 +59,7 @@ export class Race {
     this.views = [];
     this.bots = new Map();
     this.items = new ItemSystem(this.scene, this.track, this.fx, { itemRows: this.world.def.itemRows || [] });
+    this.coins = new CoinSystem(this.scene, this.world);
     const L = this.track.length;
     for (let i = 0; i < n; i++) {
       const isPlayer = i === playerSlot;
@@ -232,8 +234,10 @@ export class Race {
       this.lastPlace = this.player.place;
     }
 
-    // --- предметы
+    // --- предметы, монеты, слипстрим
     if (racing) this.items.update(dt, this);
+    this.coins.update(dt, racing ? this.karts : []);
+    if (racing) this.updateDraft(dt);
 
     // --- собрать события картов
     for (const k of this.karts) {
@@ -242,6 +246,34 @@ export class Race {
     }
 
     this.syncViews(dt);
+  }
+
+  /** Слипстрим: держишься в воздушном мешке прямо за соперником — через PHYS.draftTime секунд рывок. */
+  updateDraft(dt) {
+    const tr = this.track;
+    for (const k of this.karts) {
+      if (k.draftCd > 0) k.draftCd -= dt;
+      let inAir = false;
+      if (k.draftCd <= 0 && k.speed > 22 && !k.airborne && k.controllable && !k.finished) {
+        for (const o of this.karts) {
+          if (o === k || o.speed < 15) continue;
+          const ds = tr.deltaProgress(k.progress, o.progress);
+          if (ds > 2.5 && ds < 17 && Math.abs(o.lateral - k.lateral) < 2.3 && Math.abs(o.pos.y - k.pos.y) < 2) {
+            inAir = true;
+            break;
+          }
+        }
+      }
+      if (inAir) {
+        k.draft += dt;
+        if (k.draft >= PHYS.draftTime) {
+          k.draft = 0;
+          k.draftCd = 2.5;
+          k.addBoost(PHYS.draftBoost[0], PHYS.draftBoost[1], 'draft', 'draft');
+          k.emit('slipstream');
+        }
+      } else k.draft = Math.max(0, k.draft - dt * 2);
+    }
   }
 
   collide() {
@@ -397,5 +429,6 @@ export class Race {
       v.dispose();
     }
     this.items.dispose();
+    this.coins.dispose();
   }
 }

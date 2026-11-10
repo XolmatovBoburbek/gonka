@@ -75,6 +75,12 @@ export class BotDriver {
       if (best && this.skill > 0.2) target = THREE.MathUtils.lerp(target, best.lat, 0.5 + 0.4 * this.skill);
     }
 
+    // --- монеты по пути (если не едет за кристаллом)
+    if (race.coins && this.skill > 0.2 && k.coins < 10) {
+      const c = race.coins.ahead(s, 32);
+      if (c) target = THREE.MathUtils.lerp(target, c.lat, 0.25 + 0.3 * this.skill);
+    }
+
     // --- объезд ловушек
     if (race.items) {
       for (const t of race.items.traps) {

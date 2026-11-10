@@ -29,6 +29,8 @@ export class Hud {
       </div>
       <div class="hud-map"><canvas width="240" height="240"></canvas></div>
       <div class="hud-place"><span class="num">1</span><span class="of">/8</span></div>
+      <div class="hud-coins"><i class="coin"></i><b>0</b><small>/10</small></div>
+      <div class="hud-draft"><span>СЛИПСТРИМ</span><i></i></div>
       <div class="hud-callouts"></div>
       <div class="hud-speed">
         <div class="spd"><b>0</b><small>км/ч</small><span class="stk"></span></div>
@@ -91,6 +93,9 @@ export class Hud {
     this.hintEl = this.$('.hint');
     this.introEl = this.$('.hud-intro');
     // шкала оборотов на старте: границы зон — из физики (одна правда для HUD и карта)
+    this.coinsEl = this.$('.hud-coins');
+    this.coinsN = this.$('.hud-coins b');
+    this.draftEl = this.$('.hud-draft');
     this.revEl = this.$('.hud-rev');
     this.revTip = this.$('.rev-tip');
     const Z = PHYS.revZones;
@@ -388,6 +393,24 @@ export class Hud {
       this.placeNum.textContent = p.place;
       this.placeBox.dataset.place = p.place <= 3 ? p.place : 'n';
       this._last.place = p.place;
+    }
+    if (this._last.coins !== p.coins) {
+      const up = p.coins > (this._last.coins || 0);
+      this._last.coins = p.coins;
+      this.coinsN.textContent = p.coins;
+      this.coinsEl.classList.toggle('max', p.coins >= 10);
+      if (up) {
+        this.coinsEl.classList.remove('pop');
+        void this.coinsEl.offsetWidth;
+        this.coinsEl.classList.add('pop');
+      }
+    }
+    // слипстрим: полоска наполняется, пока едешь в воздушном мешке за соперником
+    const dr = Math.round(Math.min(1, p.draft / 1.4) * 20);
+    if (this._last.draft !== dr) {
+      this._last.draft = dr;
+      this.draftEl.classList.toggle('on', dr > 2);
+      this.draftEl.style.setProperty('--d', dr / 20);
     }
     const kmh = Math.round(Math.abs(p.speed) * 3.6);
     if (this._last.kmh !== kmh) {

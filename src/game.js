@@ -12,6 +12,7 @@ import { Effects } from './world/fx.js';
 import { TRACKS, loadTrack } from './tracks/index.js';
 import { CHARACTERS, getCharacter } from './data/characters.js';
 import { UI } from './ui/ui.js';
+import { CHAR_PRICES, GP_POINTS, PLACE_COINS, CUP_COINS } from './data/progress.js';
 
 const SETTINGS_KEY = 'sakura-drift-settings-v1';
 
@@ -26,6 +27,7 @@ function loadSettings() {
     laps: 3,
     character: 'sakura',
     track: 'sakura',
+    mode: 'single',
     autoGas: true,
   };
   try {
@@ -40,6 +42,19 @@ function loadSettings() {
 }
 
 const RECORDS_KEY = 'sakura-drift-records-v1';
+
+// Прогресс: кошелёк монет, открытые гонщики, лучшие места в Гран-при
+const PROFILE_KEY = 'sakura-drift-profile-v1';
+
+function loadProfile() {
+  const def = { coins: 0, unlocked: [], cups: {} };
+  try {
+    const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+    return { ...def, ...p, coins: Math.max(0, Math.floor(+p.coins || 0)), unlocked: Array.isArray(p.unlocked) ? p.unlocked : [], cups: p.cups && typeof p.cups === 'object' ? p.cups : {} };
+  } catch {
+    return def;
+  }
+}
 
 function loadRecords() {
   try {
@@ -86,6 +101,8 @@ export class Game {
     this.demoTarget = 0;
 
     this.records = loadRecords();
+    this.profile = loadProfile();
+    this.gp = null; // идущий Гран-при: { tracks, index, points }
     this.ui = new UI(this, root.querySelector('#ui'));
 
     const unlock = () => this.audio.unlock();
@@ -105,6 +122,70 @@ export class Game {
     } catch {
       /* приватный режим — ничего страшного */
     }
+  }
+
+  saveProfile() {
+    try {
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(this.profile));
+    } catch {
+      /* без сохранения */
+    }
+  }
+
+  isUnlocked(id) {
+    return !CHAR_PRICES[id] || this.profile.unlocked.includes(id);
+  }
+
+  /** Открыть гонщика за монеты; true — получилось. */
+  unlockChar(id) {
+    const price = CHAR_PRICES[id];
+    if (!price || this.isUnlocked(id) || this.profile.coins < price) return false;
+    this.profile.coins -= price;
+    this.profile.unlocked.push(id);
+    this.saveProfile();
+    return true;
+  }
+
+  /** Гран-при: все трассы подряд, очки за места. */
+  startGP() {
+    this.gp = { tracks: TRACKS.map((t) => t.id), index: 0, points: {} };
+    this.settings.track = this.gp.tracks[0];
+    return this.startRace();
+  }
+
+  nextGPRace() {
+    const gp = this.gp;
+    if (!gp || gp.index + 1 >= gp.tracks.length) return;
+    gp.index++;
+    this.settings.track = gp.tracks[gp.index];
+    return this.startRace();
+  }
+
+  /** Итоги гонки: монеты в кошелёк (собранные + за место), очки Гран-при, в последней гонке — кубок. */
+  finishRewards(results) {
+    const player = this.race.player;
+    const place = results.findIndex((r) => r.kart === player) + 1;
+    const out = { collected: player.coinsTotal, placeBonus: PLACE_COINS[place - 1] || 0, cupBonus: 0, gp: null };
+    const gp = this.gp;
+    if (gp) {
+      const gain = {};
+      results.forEach((r, i) => {
+        gain[r.char.id] = GP_POINTS[i] || 0;
+        gp.points[r.char.id] = (gp.points[r.char.id] || 0) + gain[r.char.id];
+      });
+      const standings = results.map((r) => ({ char: r.char, me: r.kart === player, total: gp.points[r.char.id] })).sort((a, b) => b.total - a.total);
+      const final = gp.index + 1 >= gp.tracks.length;
+      out.gp = { race: gp.index + 1, races: gp.tracks.length, gain, points: { ...gp.points }, standings, final, cupPlace: standings.findIndex((s) => s.me) + 1 };
+      if (final) {
+        out.cupBonus = CUP_COINS[out.gp.cupPlace - 1] || 0;
+        const d = this.settings.difficulty;
+        this.profile.cups[d] = Math.min(this.profile.cups[d] || 9, out.gp.cupPlace);
+      }
+    }
+    out.coins = out.collected + out.placeBonus + out.cupBonus;
+    this.profile.coins += out.coins;
+    this.saveProfile();
+    return out;
   }
 
   recordKey(track = this.settings.track, laps = this.settings.laps) {
@@ -232,11 +313,19 @@ export class Game {
   async startRace(opts = {}) {
     this.ui.setLoading(true, 'Готовим трассу…');
     await this.nextFrame();
+    if (!this.isUnlocked(this.settings.character)) this.settings.character = 'sakura';
     await this.loadWorld(this.settings.track);
     this.disposeRace();
     const def = await loadTrack(this.settings.track);
+    // Гран-при: со второй гонки стартовая решётка — по общему зачёту
+    let playerSlot;
+    if (this.gp && this.gp.index > 0) {
+      const mine = this.gp.points[this.settings.character] || 0;
+      playerSlot = Object.entries(this.gp.points).filter(([id, p]) => id !== this.settings.character && p > mine).length;
+    }
     const race = new Race({
       world: this.world,
+      playerSlot,
       playerChar: getCharacter(this.settings.character),
       difficulty: this.settings.difficulty,
       laps: this.settings.laps,
@@ -272,6 +361,7 @@ export class Game {
   }
 
   async toMenu() {
+    this.gp = null;
     this.paused = false;
     this.state = 'menu';
     this.audio.stopEngine();
@@ -451,7 +541,8 @@ export class Game {
       else this.rig.updateFinish(dt, player);
       if (this.finishTimer > 3.2 && !this.resultsShown) {
         this.resultsShown = true;
-        this.ui.showResults(race.results(), race.player, this.lastRecord);
+        const res = race.results();
+        this.ui.showResults(res, race.player, this.lastRecord, this.finishRewards(res));
         this.audio.setMusicIntensity(0); // финальный круг ускорял музыку — результаты в обычном темпе
         this.audio.playMusic('results');
       }
@@ -568,7 +659,7 @@ export class Game {
           break;
         case 'boost':
           // бусты складываются: второй поверх первого звучит выше
-          if (vol > 0.05 && (e.kind === 'pad' || e.kind === 'item' || e.kind === 'rocket' || e.kind === 'trick')) a.sfx('boost', { volume: vol, pitch: 1 + Math.min(2, e.stack - 1) * 0.12 });
+          if (vol > 0.05 && (e.kind === 'pad' || e.kind === 'item' || e.kind === 'rocket' || e.kind === 'trick' || e.kind === 'draft')) a.sfx('boost', { volume: vol, pitch: 1 + Math.min(2, e.stack - 1) * 0.12 });
           if (isP) {
             this.rig.shake(e.kind === 'item' ? 0.5 : 0.3);
             if (e.kind === 'item' || e.kind === 'pad') this.flash = Math.max(this.flash, 0.12);
@@ -591,6 +682,16 @@ export class Game {
             a.sfx('driftLevel', { pitch: [1, 1, 1.25, 1.5][e.level] });
             this.ui.hud.hint(this.ui.hud.touchEnabled ? 'Буст накоплен — жми БУСТ или копи дальше!' : 'Буст накоплен — жми F или копи до трёх делений!', 3.5);
           }
+          break;
+        case 'coin':
+          if (isP) a.sfx('coin', { volume: 0.7, pitch: 1 + Math.min(10, k.coins) * 0.03 });
+          break;
+        case 'coinLoss':
+          if (isP) this.ui.hud.callout(`−${e.n} монеты`, 'warn');
+          fx.burst(k.pos.clone().add(new THREE.Vector3(0, 1, 0)), 0xffc21a, 4 * e.n, 7, { size: 0.5, life: 0.6 });
+          break;
+        case 'slipstream':
+          if (isP) this.ui.hud.callout('СЛИПСТРИМ!', 'boost1');
           break;
         case 'boostEmpty':
           if (isP) a.sfx('uiBack', { volume: 0.5 });
