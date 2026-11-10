@@ -5,3 +5,6 @@ dist-single/
 *.log
 .DS_Store
 .dev/
+
+# Roblox
+roblox/build/

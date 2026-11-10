@@ -1,0 +1,6 @@
+local Track = require("Track")
+local data = require("Neon")
+local tr = Track.new(data)
+print("count", tr.count, "len", tr.length, "spacing", tr.spacing)
+local fr = tr:frameAt(10.5)
+print("frame", fr.pos.X, fr.pos.Y, fr.pos.Z, fr.right.X, fr.up.Y, fr.hw)
