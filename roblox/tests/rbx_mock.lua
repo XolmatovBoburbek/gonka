@@ -77,6 +77,9 @@ InstMT.__newindex = function(t, k, v)
 end
 function Inst:FindFirstChild(n) for _, c in rawget(self, "_children") do if c.Name == n then return c end end return nil end
 function Inst:WaitForChild(n) local v = self[n]; assert(v ~= nil, "WaitForChild: нет " .. tostring(n)); return v end
+function Inst:GetDescendants() local out = {}; local function walk(o) for _, c in rawget(o, "_children") do table.insert(out, c); walk(c) end end; walk(self); return out end
+function Inst:FindFirstChildOfClass(c) for _, ch in rawget(self, "_children") do if rawget(ch, "ClassName") == c then return ch end end return nil end
+function Inst:GetPropertyChangedSignal() return { Connect = function() end } end
 function Inst:GetChildren() return table.clone(rawget(self, "_children")) end
 function Inst:Destroy() self.Parent = nil end
 function Inst:SetAttribute(k, v) rawget(self, "_attrs")[k] = v end
@@ -117,6 +120,7 @@ end
 workspace = game:GetService("Workspace")
 workspace.CurrentCamera = newInst("Camera")
 workspace.CurrentCamera.FieldOfView = 70
+workspace.CurrentCamera.ViewportSize = { X = 1280, Y = 720 }
 workspace.Terrain = newInst("Terrain")
 local RS = game:GetService("ReplicatedStorage")
 -- папка Shared: обращение к модулю по имени даёт ссылку для require

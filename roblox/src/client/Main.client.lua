@@ -16,7 +16,7 @@ local Tracks = require(Shared:WaitForChild("Tracks"))
 local Kart = require(Shared:WaitForChild("Kart"))
 local Bot = require(Shared:WaitForChild("Bot"))
 local Net = require(Shared:WaitForChild("Net"))
-local Characters = require(Shared:WaitForChild("Characters"))
+local Cars = require(Shared:WaitForChild("Cars"))
 
 stage("модули клиента")
 local Input = require(script.Parent:WaitForChild("Input"))
@@ -41,11 +41,6 @@ pcall(function()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
 end)
 
-local CHAR_BY_ID = {}
-for _, c in Characters do
-	CHAR_BY_ID[c.id] = c
-end
-
 local function now(): number
 	return workspace:GetServerTimeNow()
 end
@@ -54,7 +49,6 @@ end
 
 local R: any = nil -- текущая гонка (после "setup")
 local profile: any = nil
-local myKey = "p" .. player.UserId
 
 local function clearRace()
 	if not R then
@@ -99,8 +93,7 @@ local function setupRace(d)
 		track = track,
 		trackId = d.trackId,
 		laps = d.laps,
-		raceNum = d.raceNum,
-		raceCount = d.raceCount,
+		pvp = d.pvp,
 		myId = d.myId,
 		roster = {},
 		remote = {},
@@ -123,16 +116,17 @@ local function setupRace(d)
 	}
 	for _, e in d.roster do
 		r.roster[e.id] = e
-		local c = CHAR_BY_ID[e.charId] or Characters[1]
+		local c = Cars.get(e.carId)
+		local paint = Color3.fromHex(Cars.paint(e.paint).color)
 		if e.id ~= d.myId then
-			local m = KartModel.new(c, e.name, false)
+			local m = KartModel.new(c, paint, e.name, false)
 			m:setParent(built.folder)
 			r.remote[e.id] = { model = m, net = nil, disp = nil, heading = 0, recv = 0, hint = -1, up = Vector3.yAxis, roster = e }
 		end
 	end
 	if d.myId > 0 then
 		local me = r.roster[d.myId]
-		local c = CHAR_BY_ID[me.charId] or Characters[1]
+		local c = Cars.get(me.carId)
 		local k = Kart.new(track, { stats = c.stats, isPlayer = true })
 		local L = track.length
 		local slot = d.myId - 1
@@ -143,7 +137,7 @@ local function setupRace(d)
 		k.totalProgress = -L + k.progress
 		k.onGrid = true
 		r.kart = k
-		r.myModel = KartModel.new(c, me.name, true)
+		r.myModel = KartModel.new(c, Color3.fromHex(Cars.paint(me.paint).color), me.name, true)
 		r.myModel:setParent(built.folder)
 		if d.phase == "race" then
 			-- подключились посреди гонки (переподключение) — сразу в путь
@@ -227,6 +221,9 @@ local function onRace(kind: string, d: any)
 		setupRace(d)
 	elseif kind == "lobby" then
 		clearRace()
+		Hud.resetVote()
+	elseif kind == "votes" then
+		Hud.setVotes(d)
 	elseif not R then
 		return
 	elseif kind == "go" then
@@ -285,7 +282,7 @@ local function onRace(kind: string, d: any)
 			Hud.callout(string.format("%s финишировал%s %d-м", who.name, "", d.place), Color3.fromRGB(90, 80, 130), 1.4)
 		end
 	elseif kind == "results" then
-		Hud.showResults(d, R.myId, myKey)
+		Hud.showResults(d, R.myId)
 		Audio.playMusic("results")
 		Audio.setMusicSpeed(1)
 		Audio.stopEngine()
@@ -615,30 +612,30 @@ end
 -- ---------------------------------------------------------------- кнопки гаража
 
 stage("интерфейс")
+local function shop(action: string, arg: any, okSound: string)
+	local ok, res = pcall(function()
+		return RF_Shop:InvokeServer(action, arg)
+	end)
+	if ok and res then
+		Audio.sfx(okSound, 0.8)
+		profile = res
+		Hud.setProfile(res)
+	end
+end
+
 Hud.init({
 	buy = function(id: string)
-		local ok, res = pcall(function()
-			return RF_Shop:InvokeServer("buy", id)
-		end)
-		if ok and res then
-			if res.owned[id] then
-				Audio.sfx("uiStart", 0.8)
-			else
-				Audio.sfx("uiBack", 0.8)
-			end
-			profile = res
-			Hud.setProfile(res)
-		end
+		shop("buy", id, "uiStart")
 	end,
 	select = function(id: string)
-		local ok, res = pcall(function()
-			return RF_Shop:InvokeServer("select", id)
-		end)
-		if ok and res then
-			Audio.sfx("uiSelect", 0.8)
-			profile = res
-			Hud.setProfile(res)
-		end
+		shop("select", id, "uiSelect")
+	end,
+	paint = function(i: number)
+		shop("paint", i, "uiMove")
+	end,
+	vote = function(id: string)
+		RE_Action:FireServer("vote", id)
+		Audio.sfx("uiSelect", 0.7)
 	end,
 })
 
@@ -657,6 +654,7 @@ RunService.RenderStepped:Connect(function(dt: number)
 	local phaseStart = ReplicatedStorage:GetAttribute("SD_PhaseStart") or now()
 	local t = now() - phaseStart
 	World.update(dt)
+	Hud.tick(dt)
 
 	if phase == "lobby" or not R then
 		if R then
@@ -664,21 +662,12 @@ RunService.RenderStepped:Connect(function(dt: number)
 		end
 		Audio.playMusic("menu")
 		Hud.setMode("lobby")
-		if phase == "lobby" then
-			local left = math.max(0, math.ceil(Config.LOBBY_TIME - t))
-			Hud.banner(
-				"SAKURA DRIFT GP",
-				string.format("Гран-при начнётся через %d с · выберите гонщика в гараже", left)
-			)
-		else
-			Hud.banner("SAKURA DRIFT GP", "Подключаемся к гонке…")
-		end
+		local left = math.max(0, math.ceil(Config.LOBBY_TIME - t))
+		Hud.lobby(left, ReplicatedStorage:GetAttribute("SD_Players") or 1, ReplicatedStorage:GetAttribute("SD_Need") or 1)
 		local w = World.current()
 		if w then
-			local tr = w.track
-			local c = (tr.boundsMin + tr.boundsMax) / 2
-			local ext = (tr.boundsMax - tr.boundsMin).Magnitude
-			orbitCam(dt, c, ext * 0.45, ext * 0.22, 0.05)
+			-- камера кружит у стартовой арки
+			orbitCam(dt, w.track:pointAt(6, 0, 2), 30, 9, 0.12)
 		end
 		return
 	end
@@ -706,14 +695,13 @@ RunService.RenderStepped:Connect(function(dt: number)
 			myPlace = i
 		end
 		local e = R.roster[o.id]
-		local c = e and CHAR_BY_ID[e.charId]
-		table.insert(rows, { name = if e then e.name else "?", me = o.me, color = c and Color3.fromHex(c.kart) })
+		table.insert(rows, { name = if e then e.name else "?", me = o.me, color = if e then Color3.fromHex(Cars.paint(e.paint).color) else nil })
 	end
 
 	if phase == "intro" then
 		Hud.setMode("intro")
 		local d = R.track.data
-		Hud.banner(d.name .. "  " .. d.jp, string.format("Гонка %d из %d · %s · %d круга", R.raceNum, R.raceCount, d.time, R.laps))
+		Hud.banner(d.name .. "  " .. d.jp, string.format("%s · %s · кругов: %d", if R.pvp then "Онлайн-заезд" else "Заезд с ботами", d.time, R.laps))
 		local u = math.clamp(t / Config.INTRO_TIME, 0, 1)
 		local L = R.track.length
 		local e = 1 - (1 - u) ^ 2
@@ -766,7 +754,7 @@ RunService.RenderStepped:Connect(function(dt: number)
 		else
 			-- зритель: камера за лидером
 			Hud.setMode("spectate")
-			Hud.banner("ВЫ ЗРИТЕЛЬ", "Присоединитесь со следующей гонки")
+			Hud.banner("ИДЁТ ЗАЕЗД", "Вы присоединитесь к следующему — он начнётся после финиша")
 			local lead = order[1]
 			local rk = lead and R.remote[lead.id]
 			if rk and rk.disp and rk.net then

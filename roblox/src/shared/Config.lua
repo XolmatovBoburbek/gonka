@@ -6,23 +6,28 @@ Config.SCALE = 3
 Config.LAPS = 3
 Config.MAX_KARTS = 8
 Config.BOT_DIFFICULTY = "normal" -- easy | normal | hard
-Config.TRACK_ORDER = { "sakura", "neon", "sunset", "momiji" } -- Гран-при: четыре гонки подряд
+Config.TRACK_ORDER = { "sakura", "neon", "sunset", "momiji" } -- трассы для голосования
+
+-- Игроки против игроков: при двух и более игроках ботов нет (BOTS_PVP), одному игроку
+-- добавляются соперники-боты (BOTS_SOLO; 0 — ждать второго игрока).
+Config.BOTS_PVP = 0
+Config.BOTS_SOLO = 5
+Config.MIN_PLAYERS = 1 -- сколько игроков нужно для старта, если BOTS_SOLO = 0, ставьте 2
 
 -- Время фаз (секунды)
-Config.LOBBY_TIME = 12 -- ожидание перед Гран-при (пока хоть один игрок на сервере)
+Config.LOBBY_TIME = 18 -- лобби: голосование за трассу и гараж
 Config.INTRO_TIME = 4 -- облёт трассы перед стартом
 Config.COUNT_TIME = 3 -- светофор (газ на старте!)
-Config.RESULTS_TIME = 10 -- таблица после гонки
-Config.GP_RESULTS_TIME = 14 -- итог Гран-при
+Config.RESULTS_TIME = 9 -- таблица после гонки
 Config.FINISH_TIMEOUT = 35 -- после финиша первого игрока остальные успевают доехать
 Config.RACE_TIMEOUT = 420 -- предохранитель
 
--- Награды (как в веб-версии)
-Config.GP_POINTS = { 15, 12, 10, 8, 6, 4, 2, 1 }
+-- Награды: монеты за место и кубки рейтинга (только в заездах с двумя и более игроками)
 Config.PLACE_COINS = { 60, 45, 35, 25, 20, 15, 10, 5 }
-Config.CUP_COINS = { 300, 200, 120 }
+Config.TROPHY_WIN = 30 -- первому среди игроков
+Config.TROPHY_LOSE = -15 -- последнему среди игроков; остальные — между ними
 
-Config.DATASTORE = "SakuraDriftProfiles_v1"
+Config.DATASTORE = "SakuraDriftProfiles_v2"
 
 -- Звуки: вставьте сюда ID загруженных аудио ("rbxassetid://123..."). Пустая строка — звука нет.
 -- Файлы для загрузки лежат в roblox/assets/audio (см. README).

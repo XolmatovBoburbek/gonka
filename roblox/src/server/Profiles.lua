@@ -5,7 +5,7 @@ local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Config"))
-local Characters = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Characters"))
+local Cars = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Cars"))
 
 local Profiles = {}
 
@@ -25,13 +25,13 @@ local profiles: { [Player]: any } = {}
 local dirty: { [Player]: boolean } = {}
 
 local function defaults()
-	local owned = {}
-	for _, c in Characters do
+	local cars = {}
+	for _, c in Cars.list do
 		if c.price == 0 then
-			owned[c.id] = true
+			cars[c.id] = true
 		end
 	end
-	return { coins = 0, owned = owned, selected = "sakura", cups = 0, races = 0, wins = 0 }
+	return { coins = 0, cars = cars, car = Cars.list[1].id, paint = 1, trophies = 0, races = 0, wins = 0 }
 end
 
 local function key(p: Player): string
@@ -58,12 +58,46 @@ function Profiles.load(p: Player)
 		for k, v in data do
 			prof[k] = v
 		end
-		for id, v in defaults().owned do
-			prof.owned[id] = v
+		if type(prof.cars) ~= "table" then
+			prof.cars = {}
+		end
+		for id, v in defaults().cars do
+			prof.cars[id] = v
 		end
 	end
 	profiles[p] = prof
+	-- таблица лидеров Роблокса (список игроков): кубки и победы
+	local ls = Instance.new("Folder")
+	ls.Name = "leaderstats"
+	local tr = Instance.new("IntValue")
+	tr.Name = "Кубки"
+	tr.Value = prof.trophies
+	tr.Parent = ls
+	local w = Instance.new("IntValue")
+	w.Name = "Победы"
+	w.Value = prof.wins
+	w.Parent = ls
+	if p:FindFirstChild("leaderstats") then
+		(p:FindFirstChild("leaderstats") :: Instance):Destroy()
+	end
+	ls.Parent = p
 	return prof
+end
+
+--- Обновить значения в списке игроков.
+function Profiles.syncStats(p: Player)
+	local prof = profiles[p]
+	local ls = p:FindFirstChild("leaderstats")
+	if prof and ls then
+		local a = ls:FindFirstChild("Кубки")
+		local b = ls:FindFirstChild("Победы")
+		if a and a:IsA("IntValue") then
+			a.Value = prof.trophies
+		end
+		if b and b:IsA("IntValue") then
+			b.Value = prof.wins
+		end
+	end
 end
 
 function Profiles.get(p: Player)
@@ -101,7 +135,7 @@ function Profiles.view(p: Player)
 	if not prof then
 		return nil
 	end
-	return { coins = prof.coins, owned = prof.owned, selected = prof.selected, cups = prof.cups, races = prof.races, wins = prof.wins }
+	return { coins = prof.coins, cars = prof.cars, car = prof.car, paint = prof.paint, trophies = prof.trophies, races = prof.races, wins = prof.wins }
 end
 
 function Profiles.addCoins(p: Player, n: number)

@@ -13,7 +13,7 @@ local Kart = require(Shared:WaitForChild("Kart"))
 local Bot = require(Shared:WaitForChild("Bot"))
 local Layout = require(Shared:WaitForChild("Layout"))
 local Net = require(Shared:WaitForChild("Net"))
-local Characters = require(Shared:WaitForChild("Characters"))
+local Cars = require(Shared:WaitForChild("Cars"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 
 Players.CharacterAutoLoads = false -- в гонке аватар не нужен: камера и карт — свои
@@ -23,11 +23,6 @@ local RE_Snap = Net.get("Snapshot") :: UnreliableRemoteEvent
 local RE_Race = Net.get("Race") :: RemoteEvent
 local RE_Action = Net.get("Action") :: RemoteEvent
 local RF_Shop = Net.get("Shop") :: RemoteFunction
-
-local CHAR_BY_ID = {}
-for _, c in Characters do
-	CHAR_BY_ID[c.id] = c
-end
 
 local rng = Random.new()
 local function rnd(): number
@@ -41,9 +36,9 @@ end
 
 type Racer = {
 	id: number,
-	key: string, -- для очков Гран-при: "p<UserId>" / "b<charId>"
 	name: string,
-	charId: string,
+	carId: string,
+	paint: number,
 	isBot: boolean,
 	player: Player?,
 	body: any, -- Kart (бот) или прокси игрока с теми же полями
@@ -60,8 +55,8 @@ local S = {
 	phaseStart = now(),
 	trackId = Config.TRACK_ORDER[1],
 	track = nil :: any,
-	raceNum = 0,
-	gp = { points = {} :: { [string]: number }, names = {} :: { [string]: string }, botChars = {} :: { string } },
+	votes = {} :: { [Player]: string },
+	pvp = false,
 	racers = {} :: { Racer },
 	byPlayer = {} :: { [Player]: Racer },
 	order = {} :: { Racer },
@@ -86,8 +81,6 @@ local function setPhase(phase: string)
 	ReplicatedStorage:SetAttribute("SD_Phase", phase)
 	ReplicatedStorage:SetAttribute("SD_PhaseStart", S.phaseStart)
 	ReplicatedStorage:SetAttribute("SD_Track", S.trackId)
-	ReplicatedStorage:SetAttribute("SD_RaceNum", S.raceNum)
-	ReplicatedStorage:SetAttribute("SD_RaceCount", #Config.TRACK_ORDER)
 end
 
 local function sendAll(kind: string, data: any?)
@@ -159,7 +152,8 @@ local function rosterView()
 		table.insert(list, {
 			id = r.id,
 			name = r.name,
-			charId = r.charId,
+			carId = r.carId,
+			paint = r.paint,
 			isBot = r.isBot,
 			userId = if r.player then r.player.UserId else 0,
 		})
@@ -200,8 +194,7 @@ local function setupView(forPlayer: Player?)
 	return {
 		trackId = S.trackId,
 		laps = Config.LAPS,
-		raceNum = S.raceNum,
-		raceCount = #Config.TRACK_ORDER,
+		pvp = S.pvp,
 		roster = rosterView(),
 		myId = if me then me.id else 0,
 		boxes = boxState(),
@@ -213,9 +206,43 @@ local function setupView(forPlayer: Player?)
 	}
 end
 
+local function voteCounts()
+	local counts = {}
+	for _, id in Config.TRACK_ORDER do
+		counts[id] = 0
+	end
+	for p, id in S.votes do
+		if p.Parent and counts[id] then
+			counts[id] += 1
+		end
+	end
+	return counts
+end
+
+local function pickTrack(): string
+	local counts = voteCounts()
+	local best, top = {}, 0
+	for _, id in Config.TRACK_ORDER do
+		if counts[id] > top then
+			top = counts[id]
+			best = { id }
+		elseif counts[id] == top then
+			table.insert(best, id)
+		end
+	end
+	if top == 0 and #best > 1 then
+		-- никто не голосовал — любая, кроме только что сыгранной
+		local i = table.find(best, S.trackId)
+		if i then
+			table.remove(best, i)
+		end
+	end
+	return best[rng:NextInteger(1, #best)]
+end
+
 local function startRace()
-	S.raceNum += 1
-	S.trackId = Config.TRACK_ORDER[((S.raceNum - 1) % #Config.TRACK_ORDER) + 1]
+	S.trackId = pickTrack()
+	S.votes = {}
 	local track = Tracks.get(S.trackId)
 	S.track = track
 	S.racers = {}
@@ -226,64 +253,40 @@ local function startRace()
 	S.firstHumanFinish = nil
 	S.allHumansDoneAt = nil
 
-	-- кто едет: все готовые игроки (до 8), остальное — боты
-	local plist = {}
-	for p in S.ready do
-		if p.Parent and Profiles.get(p) and #plist < Config.MAX_KARTS then
-			table.insert(plist, p)
-		end
-	end
-	local n = Config.MAX_KARTS
-	local nb = n - #plist
-
-	-- сетка: в первой гонке игроки — с середины, дальше — в обратном порядке очков (лидер стартует последним)
+	-- кто едет: все готовые игроки (до 8). Боты — только если игрок один (или так задано в Config)
 	local entries = {}
-	for _, p in plist do
+	for p in S.ready do
 		local prof = Profiles.get(p)
-		local cid = if CHAR_BY_ID[prof.selected] and prof.owned[prof.selected] then prof.selected else "sakura"
-		table.insert(entries, { player = p, key = "p" .. p.UserId, name = p.DisplayName, charId = cid })
-	end
-	for i = 1, nb do
-		local cid = S.gp.botChars[((i - 1) % #S.gp.botChars) + 1]
-		table.insert(entries, { key = "b" .. cid .. i, name = CHAR_BY_ID[cid].name, charId = cid })
-	end
-	if S.raceNum % #Config.TRACK_ORDER == 1 then
-		-- боты спереди и сзади, игроки — в середине
-		local bots, ppl = {}, {}
-		for _, e in entries do
-			table.insert(if e.player then ppl else bots, e)
-		end
-		shuffle(bots)
-		shuffle(ppl)
-		local front = math.floor(#bots / 2)
-		entries = {}
-		for i = 1, front do
-			table.insert(entries, bots[i])
-		end
-		for _, e in ppl do
-			table.insert(entries, e)
-		end
-		for i = front + 1, #bots do
-			table.insert(entries, bots[i])
-		end
-	else
-		table.sort(entries, function(a, b)
-			local pa, pb = S.gp.points[a.key] or 0, S.gp.points[b.key] or 0
-			if pa ~= pb then
-				return pa < pb
+		if p.Parent and prof and #entries < Config.MAX_KARTS then
+			local car = Cars.get(prof.car)
+			if not prof.cars[car.id] then
+				car = Cars.list[1]
 			end
-			return a.key < b.key
-		end)
+			table.insert(entries, { player = p, name = p.DisplayName, carId = car.id, paint = math.clamp(prof.paint or 1, 1, #Cars.paints) })
+		end
 	end
+	shuffle(entries)
+	S.pvp = #entries >= 2
+	local nb = math.min(Config.MAX_KARTS - #entries, if S.pvp then Config.BOTS_PVP else Config.BOTS_SOLO)
+	local bots = {}
+	for i = 1, nb do
+		local car = Cars.list[rng:NextInteger(1, #Cars.list)]
+		table.insert(bots, { name = "Бот " .. car.name, carId = car.id, paint = rng:NextInteger(1, #Cars.paints) })
+	end
+	-- боты занимают первые ряды, игроки — за ними
+	for _, e in entries do
+		table.insert(bots, e)
+	end
+	entries = bots
 
 	for slot, e in entries do
 		local s0, lat = gridPlace(track, slot - 1)
-		local c = CHAR_BY_ID[e.charId]
+		local c = Cars.get(e.carId)
 		local r: Racer = {
 			id = slot,
-			key = e.key,
 			name = e.name,
-			charId = e.charId,
+			carId = e.carId,
+			paint = e.paint,
 			isBot = e.player == nil,
 			player = e.player,
 			body = nil,
@@ -318,7 +321,6 @@ local function startRace()
 			r.body = px
 			S.byPlayer[e.player] = r
 		end
-		S.gp.names[r.key] = r.name
 		table.insert(S.racers, r)
 	end
 	S.order = table.clone(S.racers)
@@ -338,16 +340,12 @@ local function startRace()
 	end
 end
 
-local function newGP()
-	S.raceNum = 0
-	S.gp = { points = {}, names = {}, botChars = {} }
-	local ids = {}
-	for _, c in Characters do
-		table.insert(ids, c.id)
-	end
-	shuffle(ids)
-	S.gp.botChars = ids
+local function goLobby()
+	S.votes = {}
 	S.lastResults = nil
+	setPhase("lobby")
+	sendAll("lobby", {})
+	sendAll("votes", voteCounts())
 end
 
 -- ---------------------------------------------------------------- предметы
@@ -793,62 +791,56 @@ end
 
 local function results()
 	updateOrder()
-	local final = S.raceNum >= #Config.TRACK_ORDER
+	local hs = {}
+	for _, r in S.order do
+		if not r.isBot then
+			table.insert(hs, r)
+		end
+	end
+	local pvp = #hs >= 2
+	local delta = {}
+	for i, r in hs do
+		if pvp then
+			delta[r] = math.floor(Config.TROPHY_WIN + (Config.TROPHY_LOSE - Config.TROPHY_WIN) * (i - 1) / (#hs - 1) + 0.5)
+		else
+			delta[r] = 0
+		end
+	end
 	local list = {}
 	for place, r in S.order do
-		local gain = Config.GP_POINTS[place] or 0
-		S.gp.points[r.key] = (S.gp.points[r.key] or 0) + gain
 		table.insert(list, {
 			id = r.id,
 			name = r.name,
-			charId = r.charId,
+			carId = r.carId,
+			paint = r.paint,
 			isBot = r.isBot,
 			place = place,
 			time = r.finishTime,
 			finished = r.finished,
-			gain = gain,
-			total = S.gp.points[r.key],
-			key = r.key,
+			trophies = delta[r] or 0,
 		})
 	end
-	local standings = {}
-	for key, pts in S.gp.points do
-		table.insert(standings, { key = key, name = S.gp.names[key] or key, total = pts })
-	end
-	table.sort(standings, function(a, b)
-		if a.total ~= b.total then
-			return a.total > b.total
-		end
-		return a.key < b.key
-	end)
-	local data = { list = list, final = final, standings = standings, raceNum = S.raceNum, raceCount = #Config.TRACK_ORDER, trackId = S.trackId }
+	local data = { list = list, pvp = pvp, trackId = S.trackId }
 	S.lastResults = data
 	sendAll("results", data)
 
 	-- награды игрокам
 	for place, r in S.order do
 		local p = r.player
-		if p and p.Parent and Profiles.get(p) then
-			local prof = Profiles.get(p)
-			local reward = { collected = r.coinsTotal, placeBonus = Config.PLACE_COINS[place] or 0, cupBonus = 0, cupPlace = 0 }
-			if final then
-				for i, st in standings do
-					if st.key == r.key then
-						reward.cupPlace = i
-						reward.cupBonus = Config.CUP_COINS[i] or 0
-					end
-				end
-				if reward.cupPlace >= 1 and reward.cupPlace <= 3 then
-					prof.cups = (prof.cups or 0) + 1
-				end
-			end
-			reward.total = reward.collected + reward.placeBonus + reward.cupBonus
+		local prof = p and Profiles.get(p)
+		if p and p.Parent and prof then
+			local reward = { collected = r.coinsTotal, placeBonus = Config.PLACE_COINS[place] or 0, trophies = delta[r] or 0, pvp = pvp, total = 0 }
+			reward.total = reward.collected + reward.placeBonus
 			prof.coins += reward.total
 			prof.races = (prof.races or 0) + 1
-			if place == 1 then
-				prof.wins = (prof.wins or 0) + 1
+			if pvp then
+				prof.trophies = math.max(0, (prof.trophies or 0) + reward.trophies)
+				if hs[1] == r then
+					prof.wins = (prof.wins or 0) + 1
+				end
 			end
 			Profiles.markDirty(p)
+			Profiles.syncStats(p)
 			send(p, "reward", reward)
 			send(p, "profile", Profiles.view(p))
 		end
@@ -970,11 +962,19 @@ RE_Action.OnServerEvent:Connect(function(p: Player, kind: any, data: any)
 		end
 		S.ready[p] = true
 		send(p, "profile", Profiles.view(p))
+		send(p, "votes", voteCounts())
 		if S.phase ~= "lobby" and S.track then
 			send(p, "setup", setupView(p))
 			if S.phase == "results" and S.lastResults then
 				send(p, "results", S.lastResults)
 			end
+		end
+		return
+	end
+	if kind == "vote" then
+		if S.phase == "lobby" and S.ready[p] and type(data) == "string" and table.find(Config.TRACK_ORDER, data) then
+			S.votes[p] = data
+			sendAll("votes", voteCounts())
 		end
 		return
 	end
@@ -1017,16 +1017,19 @@ RF_Shop.OnServerInvoke = function(p: Player, action: any, id: any)
 	if not prof then
 		return nil
 	end
-	local c = if type(id) == "string" then CHAR_BY_ID[id] else nil
-	if action == "buy" and c and not prof.owned[c.id] then
+	local c = if type(id) == "string" then Cars.byId[id] else nil
+	if action == "buy" and c and not prof.cars[c.id] then
 		if prof.coins >= c.price then
 			prof.coins -= c.price
-			prof.owned[c.id] = true
-			prof.selected = c.id
+			prof.cars[c.id] = true
+			prof.car = c.id
 			Profiles.save(p)
 		end
-	elseif action == "select" and c and prof.owned[c.id] then
-		prof.selected = c.id
+	elseif action == "select" and c and prof.cars[c.id] then
+		prof.car = c.id
+		Profiles.markDirty(p)
+	elseif action == "paint" and type(id) == "number" and Cars.paints[id] then
+		prof.paint = id
 		Profiles.markDirty(p)
 	end
 	return Profiles.view(p)
@@ -1043,6 +1046,7 @@ end
 
 Players.PlayerRemoving:Connect(function(p)
 	S.ready[p] = nil
+	S.votes[p] = nil
 	local r = S.byPlayer[p]
 	if r then
 		S.byPlayer[p] = nil
@@ -1061,7 +1065,6 @@ end)
 
 -- ---------------------------------------------------------------- главный цикл
 
-newGP()
 setPhase("lobby")
 
 local snapAcc = 0
@@ -1076,11 +1079,26 @@ RunService.Heartbeat:Connect(function(dt: number)
 	end
 
 	if S.phase == "lobby" then
-		if readyCount == 0 then
-			S.phaseStart = now() -- ждём первого игрока
+		local need = math.max(Config.MIN_PLAYERS, if Config.BOTS_SOLO > 0 then 1 else 2)
+		ReplicatedStorage:SetAttribute("SD_Need", need)
+		ReplicatedStorage:SetAttribute("SD_Players", readyCount)
+		if readyCount < need then
+			S.phaseStart = now() -- ждём игроков
 			ReplicatedStorage:SetAttribute("SD_PhaseStart", S.phaseStart)
-		elseif t >= Config.LOBBY_TIME then
-			startRace()
+		else
+			-- все проголосовали — не тянем
+			local voted = 0
+			for p in S.votes do
+				if p.Parent then
+					voted += 1
+				end
+			end
+			if voted >= readyCount and Config.LOBBY_TIME - t > 4 then
+				S.phaseStart = now() - (Config.LOBBY_TIME - 4)
+				ReplicatedStorage:SetAttribute("SD_PhaseStart", S.phaseStart)
+			elseif t >= Config.LOBBY_TIME then
+				startRace()
+			end
 		end
 		return
 	end
@@ -1107,13 +1125,16 @@ RunService.Heartbeat:Connect(function(dt: number)
 	if S.phase == "intro" or S.phase == "countdown" or S.phase == "race" then
 		local racing = S.phase == "race"
 		stepBots(dt, racing)
+		local hs = humans()
+		if #hs == 0 then
+			goLobby()
+			return
+		end
 		if racing then
 			updateItems(dt)
 			updateCoins(dt)
 			updateOrder()
-			-- конец гонки
-			local hs = humans()
-			local allDone = #hs > 0
+			local allDone = true
 			for _, h in hs do
 				if not h.finished then
 					allDone = false
@@ -1124,17 +1145,10 @@ RunService.Heartbeat:Connect(function(dt: number)
 			end
 			local tnow = now()
 			if
-				#hs == 0
-				or (S.allHumansDoneAt and tnow - S.allHumansDoneAt > 3)
+				(S.allHumansDoneAt and tnow - S.allHumansDoneAt > 3)
 				or (S.firstHumanFinish and tnow - S.firstHumanFinish > Config.FINISH_TIMEOUT)
 				or tnow - S.raceStart > Config.RACE_TIMEOUT
 			then
-				if #hs == 0 then
-					newGP()
-					setPhase("lobby")
-					sendAll("lobby", {})
-					return
-				end
 				results()
 			end
 		end
@@ -1144,18 +1158,8 @@ RunService.Heartbeat:Connect(function(dt: number)
 			snapshot()
 		end
 	elseif S.phase == "results" then
-		local final = S.raceNum >= #Config.TRACK_ORDER
-		if t >= (if final then Config.GP_RESULTS_TIME else Config.RESULTS_TIME) then
-			if readyCount == 0 then
-				newGP()
-				setPhase("lobby")
-			elseif final then
-				newGP()
-				setPhase("lobby")
-				sendAll("lobby", {})
-			else
-				startRace()
-			end
+		if t >= Config.RESULTS_TIME then
+			goLobby()
 		end
 	end
 end)

@@ -4,7 +4,10 @@
       <string name="Name">Lighting</string>
       <float name="Brightness">2.6</float>
       <float name="ClockTime">13.2</float>
+      <float name="EnvironmentDiffuseScale">0.6</float>
+      <float name="EnvironmentSpecularScale">0.6</float>
       <bool name="GlobalShadows">true</bool>
+      <token name="Technology">4</token>
     </Properties>
   </Item>
   <Item class="Players" referent="1">
@@ -327,131 +330,49 @@ return Bot
       </Item>
       <Item class="ModuleScript" referent="5">
         <Properties>
-          <string name="Name">Characters</string>
+          <string name="Name">Cars</string>
           <string name="Source"><![CDATA[--!strict
--- Гонщики (из веб-версии): цвета карта и пилота, характеристики (1..5), цена в монетах.
-return {
-	{
-		id = "sakura",
-		name = "Сакура",
-		title = "Весенний вихрь",
-		emblem = "桜",
-		kart = "#ff6fa8",
-		kartAccent = "#ffffff",
-		trim = "#ffd6e8",
-		hair = "#ff8cc0",
-		skin = "#ffe6d8",
-		outfit = "#ffffff",
-		outfitAccent = "#ff5d93",
-		stats = { speed = 3, accel = 4, handling = 3 },
-		price = 0,
-	},
-	{
-		id = "ren",
-		name = "Рэн",
-		title = "Синяя молния",
-		emblem = "雷",
-		kart = "#2f6bff",
-		kartAccent = "#ffd23f",
-		trim = "#dfe8ff",
-		hair = "#3f6dff",
-		skin = "#ffe2d2",
-		outfit = "#1d2c5e",
-		outfitAccent = "#ffd23f",
-		stats = { speed = 4, accel = 3, handling = 3 },
-		price = 0,
-	},
-	{
-		id = "yuki",
-		name = "Юки",
-		title = "Снежная принцесса",
-		emblem = "雪",
-		kart = "#f3f7ff",
-		kartAccent = "#52d4ff",
-		trim = "#8fe6ff",
-		hair = "#eef2ff",
-		skin = "#fff0e8",
-		outfit = "#a8dcff",
-		outfitAccent = "#ffffff",
-		stats = { speed = 3, accel = 3, handling = 4 },
-		price = 0,
-	},
-	{
-		id = "kaito",
-		name = "Кайто",
-		title = "Огненный гонщик",
-		emblem = "炎",
-		kart = "#ea3530",
-		kartAccent = "#23202c",
-		trim = "#ffcf4a",
-		hair = "#ff4b3a",
-		skin = "#ffddc9",
-		outfit = "#28223a",
-		outfitAccent = "#ff4b3a",
-		stats = { speed = 5, accel = 3, handling = 2 },
-		price = 0,
-	},
-	{
-		id = "hana",
-		name = "Хана",
-		title = "Солнечный лучик",
-		emblem = "花",
-		kart = "#ff8a1f",
-		kartAccent = "#22c3ae",
-		trim = "#fff1c2",
-		hair = "#ff9e3a",
-		skin = "#ffe3d2",
-		outfit = "#22c3ae",
-		outfitAccent = "#ffffff",
-		stats = { speed = 3, accel = 5, handling = 2 },
-		price = 250,
-	},
-	{
-		id = "akira",
-		name = "Акира",
-		title = "Тень Токио",
-		emblem = "影",
-		kart = "#7a3cff",
-		kartAccent = "#16121f",
-		trim = "#d9c2ff",
-		hair = "#2c2540",
-		skin = "#ffe4d6",
-		outfit = "#16121f",
-		outfitAccent = "#a064ff",
-		stats = { speed = 4, accel = 2, handling = 4 },
-		price = 450,
-	},
-	{
-		id = "neko",
-		name = "Нэко",
-		title = "Кошачья удача",
-		emblem = "猫",
-		kart = "#ffd23f",
-		kartAccent = "#ff7eb6",
-		trim = "#fff6d0",
-		hair = "#ffd84d",
-		skin = "#ffe8da",
-		outfit = "#ff7eb6",
-		outfitAccent = "#ffffff",
-		stats = { speed = 2, accel = 5, handling = 3 },
-		price = 700,
-	},
-	{
-		id = "ryu",
-		name = "Рю",
-		title = "Изумрудный дракон",
-		emblem = "龍",
-		kart = "#27b865",
-		kartAccent = "#f2fff6",
-		trim = "#b8ffd6",
-		hair = "#2fc274",
-		skin = "#ffdfcc",
-		outfit = "#1f6b47",
-		outfitAccent = "#f2fff6",
-		stats = { speed = 2, accel = 3, handling = 5 },
-		price = 1000,
-	},
+-- Машины: кузов (форма модели), характеристики (1..5, сумма 10), цена в монетах. Плюс палитра красок.
+local Cars = {}
+
+Cars.list = {
+	{ id = "comet", name = "Комета", class = "Купе", desc = "Сбалансированное купе для любого стиля", body = "coupe", stats = { speed = 3, accel = 4, handling = 3 }, price = 0 },
+	{ id = "bolt", name = "Молния RS", class = "Спорткар", desc = "Высокая максимальная скорость", body = "sport", stats = { speed = 4, accel = 3, handling = 3 }, price = 0 },
+	{ id = "mochi", name = "Моти", class = "Малолитражка", desc = "Цепкая и послушная в поворотах", body = "kei", stats = { speed = 3, accel = 3, handling = 4 }, price = 0 },
+	{ id = "brute", name = "Громила V8", class = "Маслкар", desc = "Максимум скорости, тяжёлый руль", body = "muscle", stats = { speed = 5, accel = 3, handling = 2 }, price = 0 },
+	{ id = "dune", name = "Дюна", class = "Багги", desc = "Срывается с места быстрее всех", body = "buggy", stats = { speed = 3, accel = 5, handling = 2 }, price = 250 },
+	{ id = "ronin", name = "Ронин", class = "Дрифт-кар", desc = "Скорость и точный занос", body = "drift", stats = { speed = 4, accel = 2, handling = 4 }, price = 450 },
+	{ id = "titan", name = "Титан", class = "Пикап", desc = "Мгновенный разгон, уверенный руль", body = "pickup", stats = { speed = 2, accel = 5, handling = 3 }, price = 700 },
+	{ id = "apex", name = "Апекс F", class = "Болид", desc = "Рельсы в поворотах", body = "formula", stats = { speed = 2, accel = 3, handling = 5 }, price = 1000 },
 }
+
+Cars.paints = {
+	{ name = "Сакура", color = "#ff6fa8" },
+	{ name = "Синий", color = "#2f6bff" },
+	{ name = "Белый", color = "#f3f7ff" },
+	{ name = "Красный", color = "#ea3530" },
+	{ name = "Оранжевый", color = "#ff8a1f" },
+	{ name = "Фиолетовый", color = "#7a3cff" },
+	{ name = "Жёлтый", color = "#ffd23f" },
+	{ name = "Зелёный", color = "#27b865" },
+	{ name = "Бирюзовый", color = "#18c8c8" },
+	{ name = "Чёрный", color = "#22222c" },
+}
+
+Cars.byId = {}
+for _, c in Cars.list do
+	Cars.byId[c.id] = c
+end
+
+function Cars.get(id: string?)
+	return Cars.byId[id or ""] or Cars.list[1]
+end
+
+function Cars.paint(i: number?)
+	return Cars.paints[i or 1] or Cars.paints[1]
+end
+
+return Cars
 ]]></string>
         </Properties>
       </Item>
@@ -466,23 +387,28 @@ Config.SCALE = 3
 Config.LAPS = 3
 Config.MAX_KARTS = 8
 Config.BOT_DIFFICULTY = "normal" -- easy | normal | hard
-Config.TRACK_ORDER = { "sakura", "neon", "sunset", "momiji" } -- Гран-при: четыре гонки подряд
+Config.TRACK_ORDER = { "sakura", "neon", "sunset", "momiji" } -- трассы для голосования
+
+-- Игроки против игроков: при двух и более игроках ботов нет (BOTS_PVP), одному игроку
+-- добавляются соперники-боты (BOTS_SOLO; 0 — ждать второго игрока).
+Config.BOTS_PVP = 0
+Config.BOTS_SOLO = 5
+Config.MIN_PLAYERS = 1 -- сколько игроков нужно для старта, если BOTS_SOLO = 0, ставьте 2
 
 -- Время фаз (секунды)
-Config.LOBBY_TIME = 12 -- ожидание перед Гран-при (пока хоть один игрок на сервере)
+Config.LOBBY_TIME = 18 -- лобби: голосование за трассу и гараж
 Config.INTRO_TIME = 4 -- облёт трассы перед стартом
 Config.COUNT_TIME = 3 -- светофор (газ на старте!)
-Config.RESULTS_TIME = 10 -- таблица после гонки
-Config.GP_RESULTS_TIME = 14 -- итог Гран-при
+Config.RESULTS_TIME = 9 -- таблица после гонки
 Config.FINISH_TIMEOUT = 35 -- после финиша первого игрока остальные успевают доехать
 Config.RACE_TIMEOUT = 420 -- предохранитель
 
--- Награды (как в веб-версии)
-Config.GP_POINTS = { 15, 12, 10, 8, 6, 4, 2, 1 }
+-- Награды: монеты за место и кубки рейтинга (только в заездах с двумя и более игроками)
 Config.PLACE_COINS = { 60, 45, 35, 25, 20, 15, 10, 5 }
-Config.CUP_COINS = { 300, 200, 120 }
+Config.TROPHY_WIN = 30 -- первому среди игроков
+Config.TROPHY_LOSE = -15 -- последнему среди игроков; остальные — между ними
 
-Config.DATASTORE = "SakuraDriftProfiles_v1"
+Config.DATASTORE = "SakuraDriftProfiles_v2"
 
 -- Звуки: вставьте сюда ID загруженных аудио ("rbxassetid://123..."). Пустая строка — звука нет.
 -- Файлы для загрузки лежат в roblox/assets/audio (см. README).
@@ -6182,7 +6108,7 @@ local Kart = require(Shared:WaitForChild("Kart"))
 local Bot = require(Shared:WaitForChild("Bot"))
 local Layout = require(Shared:WaitForChild("Layout"))
 local Net = require(Shared:WaitForChild("Net"))
-local Characters = require(Shared:WaitForChild("Characters"))
+local Cars = require(Shared:WaitForChild("Cars"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 
 Players.CharacterAutoLoads = false -- в гонке аватар не нужен: камера и карт — свои
@@ -6192,11 +6118,6 @@ local RE_Snap = Net.get("Snapshot") :: UnreliableRemoteEvent
 local RE_Race = Net.get("Race") :: RemoteEvent
 local RE_Action = Net.get("Action") :: RemoteEvent
 local RF_Shop = Net.get("Shop") :: RemoteFunction
-
-local CHAR_BY_ID = {}
-for _, c in Characters do
-	CHAR_BY_ID[c.id] = c
-end
 
 local rng = Random.new()
 local function rnd(): number
@@ -6210,9 +6131,9 @@ end
 
 type Racer = {
 	id: number,
-	key: string, -- для очков Гран-при: "p<UserId>" / "b<charId>"
 	name: string,
-	charId: string,
+	carId: string,
+	paint: number,
 	isBot: boolean,
 	player: Player?,
 	body: any, -- Kart (бот) или прокси игрока с теми же полями
@@ -6229,8 +6150,8 @@ local S = {
 	phaseStart = now(),
 	trackId = Config.TRACK_ORDER[1],
 	track = nil :: any,
-	raceNum = 0,
-	gp = { points = {} :: { [string]: number }, names = {} :: { [string]: string }, botChars = {} :: { string } },
+	votes = {} :: { [Player]: string },
+	pvp = false,
 	racers = {} :: { Racer },
 	byPlayer = {} :: { [Player]: Racer },
 	order = {} :: { Racer },
@@ -6255,8 +6176,6 @@ local function setPhase(phase: string)
 	ReplicatedStorage:SetAttribute("SD_Phase", phase)
 	ReplicatedStorage:SetAttribute("SD_PhaseStart", S.phaseStart)
 	ReplicatedStorage:SetAttribute("SD_Track", S.trackId)
-	ReplicatedStorage:SetAttribute("SD_RaceNum", S.raceNum)
-	ReplicatedStorage:SetAttribute("SD_RaceCount", #Config.TRACK_ORDER)
 end
 
 local function sendAll(kind: string, data: any?)
@@ -6328,7 +6247,8 @@ local function rosterView()
 		table.insert(list, {
 			id = r.id,
 			name = r.name,
-			charId = r.charId,
+			carId = r.carId,
+			paint = r.paint,
 			isBot = r.isBot,
 			userId = if r.player then r.player.UserId else 0,
 		})
@@ -6369,8 +6289,7 @@ local function setupView(forPlayer: Player?)
 	return {
 		trackId = S.trackId,
 		laps = Config.LAPS,
-		raceNum = S.raceNum,
-		raceCount = #Config.TRACK_ORDER,
+		pvp = S.pvp,
 		roster = rosterView(),
 		myId = if me then me.id else 0,
 		boxes = boxState(),
@@ -6382,9 +6301,43 @@ local function setupView(forPlayer: Player?)
 	}
 end
 
+local function voteCounts()
+	local counts = {}
+	for _, id in Config.TRACK_ORDER do
+		counts[id] = 0
+	end
+	for p, id in S.votes do
+		if p.Parent and counts[id] then
+			counts[id] += 1
+		end
+	end
+	return counts
+end
+
+local function pickTrack(): string
+	local counts = voteCounts()
+	local best, top = {}, 0
+	for _, id in Config.TRACK_ORDER do
+		if counts[id] > top then
+			top = counts[id]
+			best = { id }
+		elseif counts[id] == top then
+			table.insert(best, id)
+		end
+	end
+	if top == 0 and #best > 1 then
+		-- никто не голосовал — любая, кроме только что сыгранной
+		local i = table.find(best, S.trackId)
+		if i then
+			table.remove(best, i)
+		end
+	end
+	return best[rng:NextInteger(1, #best)]
+end
+
 local function startRace()
-	S.raceNum += 1
-	S.trackId = Config.TRACK_ORDER[((S.raceNum - 1) % #Config.TRACK_ORDER) + 1]
+	S.trackId = pickTrack()
+	S.votes = {}
 	local track = Tracks.get(S.trackId)
 	S.track = track
 	S.racers = {}
@@ -6395,64 +6348,40 @@ local function startRace()
 	S.firstHumanFinish = nil
 	S.allHumansDoneAt = nil
 
-	-- кто едет: все готовые игроки (до 8), остальное — боты
-	local plist = {}
-	for p in S.ready do
-		if p.Parent and Profiles.get(p) and #plist < Config.MAX_KARTS then
-			table.insert(plist, p)
-		end
-	end
-	local n = Config.MAX_KARTS
-	local nb = n - #plist
-
-	-- сетка: в первой гонке игроки — с середины, дальше — в обратном порядке очков (лидер стартует последним)
+	-- кто едет: все готовые игроки (до 8). Боты — только если игрок один (или так задано в Config)
 	local entries = {}
-	for _, p in plist do
+	for p in S.ready do
 		local prof = Profiles.get(p)
-		local cid = if CHAR_BY_ID[prof.selected] and prof.owned[prof.selected] then prof.selected else "sakura"
-		table.insert(entries, { player = p, key = "p" .. p.UserId, name = p.DisplayName, charId = cid })
-	end
-	for i = 1, nb do
-		local cid = S.gp.botChars[((i - 1) % #S.gp.botChars) + 1]
-		table.insert(entries, { key = "b" .. cid .. i, name = CHAR_BY_ID[cid].name, charId = cid })
-	end
-	if S.raceNum % #Config.TRACK_ORDER == 1 then
-		-- боты спереди и сзади, игроки — в середине
-		local bots, ppl = {}, {}
-		for _, e in entries do
-			table.insert(if e.player then ppl else bots, e)
-		end
-		shuffle(bots)
-		shuffle(ppl)
-		local front = math.floor(#bots / 2)
-		entries = {}
-		for i = 1, front do
-			table.insert(entries, bots[i])
-		end
-		for _, e in ppl do
-			table.insert(entries, e)
-		end
-		for i = front + 1, #bots do
-			table.insert(entries, bots[i])
-		end
-	else
-		table.sort(entries, function(a, b)
-			local pa, pb = S.gp.points[a.key] or 0, S.gp.points[b.key] or 0
-			if pa ~= pb then
-				return pa < pb
+		if p.Parent and prof and #entries < Config.MAX_KARTS then
+			local car = Cars.get(prof.car)
+			if not prof.cars[car.id] then
+				car = Cars.list[1]
 			end
-			return a.key < b.key
-		end)
+			table.insert(entries, { player = p, name = p.DisplayName, carId = car.id, paint = math.clamp(prof.paint or 1, 1, #Cars.paints) })
+		end
 	end
+	shuffle(entries)
+	S.pvp = #entries >= 2
+	local nb = math.min(Config.MAX_KARTS - #entries, if S.pvp then Config.BOTS_PVP else Config.BOTS_SOLO)
+	local bots = {}
+	for i = 1, nb do
+		local car = Cars.list[rng:NextInteger(1, #Cars.list)]
+		table.insert(bots, { name = "Бот " .. car.name, carId = car.id, paint = rng:NextInteger(1, #Cars.paints) })
+	end
+	-- боты занимают первые ряды, игроки — за ними
+	for _, e in entries do
+		table.insert(bots, e)
+	end
+	entries = bots
 
 	for slot, e in entries do
 		local s0, lat = gridPlace(track, slot - 1)
-		local c = CHAR_BY_ID[e.charId]
+		local c = Cars.get(e.carId)
 		local r: Racer = {
 			id = slot,
-			key = e.key,
 			name = e.name,
-			charId = e.charId,
+			carId = e.carId,
+			paint = e.paint,
 			isBot = e.player == nil,
 			player = e.player,
 			body = nil,
@@ -6487,7 +6416,6 @@ local function startRace()
 			r.body = px
 			S.byPlayer[e.player] = r
 		end
-		S.gp.names[r.key] = r.name
 		table.insert(S.racers, r)
 	end
 	S.order = table.clone(S.racers)
@@ -6507,16 +6435,12 @@ local function startRace()
 	end
 end
 
-local function newGP()
-	S.raceNum = 0
-	S.gp = { points = {}, names = {}, botChars = {} }
-	local ids = {}
-	for _, c in Characters do
-		table.insert(ids, c.id)
-	end
-	shuffle(ids)
-	S.gp.botChars = ids
+local function goLobby()
+	S.votes = {}
 	S.lastResults = nil
+	setPhase("lobby")
+	sendAll("lobby", {})
+	sendAll("votes", voteCounts())
 end
 
 -- ---------------------------------------------------------------- предметы
@@ -6962,62 +6886,56 @@ end
 
 local function results()
 	updateOrder()
-	local final = S.raceNum >= #Config.TRACK_ORDER
+	local hs = {}
+	for _, r in S.order do
+		if not r.isBot then
+			table.insert(hs, r)
+		end
+	end
+	local pvp = #hs >= 2
+	local delta = {}
+	for i, r in hs do
+		if pvp then
+			delta[r] = math.floor(Config.TROPHY_WIN + (Config.TROPHY_LOSE - Config.TROPHY_WIN) * (i - 1) / (#hs - 1) + 0.5)
+		else
+			delta[r] = 0
+		end
+	end
 	local list = {}
 	for place, r in S.order do
-		local gain = Config.GP_POINTS[place] or 0
-		S.gp.points[r.key] = (S.gp.points[r.key] or 0) + gain
 		table.insert(list, {
 			id = r.id,
 			name = r.name,
-			charId = r.charId,
+			carId = r.carId,
+			paint = r.paint,
 			isBot = r.isBot,
 			place = place,
 			time = r.finishTime,
 			finished = r.finished,
-			gain = gain,
-			total = S.gp.points[r.key],
-			key = r.key,
+			trophies = delta[r] or 0,
 		})
 	end
-	local standings = {}
-	for key, pts in S.gp.points do
-		table.insert(standings, { key = key, name = S.gp.names[key] or key, total = pts })
-	end
-	table.sort(standings, function(a, b)
-		if a.total ~= b.total then
-			return a.total > b.total
-		end
-		return a.key < b.key
-	end)
-	local data = { list = list, final = final, standings = standings, raceNum = S.raceNum, raceCount = #Config.TRACK_ORDER, trackId = S.trackId }
+	local data = { list = list, pvp = pvp, trackId = S.trackId }
 	S.lastResults = data
 	sendAll("results", data)
 
 	-- награды игрокам
 	for place, r in S.order do
 		local p = r.player
-		if p and p.Parent and Profiles.get(p) then
-			local prof = Profiles.get(p)
-			local reward = { collected = r.coinsTotal, placeBonus = Config.PLACE_COINS[place] or 0, cupBonus = 0, cupPlace = 0 }
-			if final then
-				for i, st in standings do
-					if st.key == r.key then
-						reward.cupPlace = i
-						reward.cupBonus = Config.CUP_COINS[i] or 0
-					end
-				end
-				if reward.cupPlace >= 1 and reward.cupPlace <= 3 then
-					prof.cups = (prof.cups or 0) + 1
-				end
-			end
-			reward.total = reward.collected + reward.placeBonus + reward.cupBonus
+		local prof = p and Profiles.get(p)
+		if p and p.Parent and prof then
+			local reward = { collected = r.coinsTotal, placeBonus = Config.PLACE_COINS[place] or 0, trophies = delta[r] or 0, pvp = pvp, total = 0 }
+			reward.total = reward.collected + reward.placeBonus
 			prof.coins += reward.total
 			prof.races = (prof.races or 0) + 1
-			if place == 1 then
-				prof.wins = (prof.wins or 0) + 1
+			if pvp then
+				prof.trophies = math.max(0, (prof.trophies or 0) + reward.trophies)
+				if hs[1] == r then
+					prof.wins = (prof.wins or 0) + 1
+				end
 			end
 			Profiles.markDirty(p)
+			Profiles.syncStats(p)
 			send(p, "reward", reward)
 			send(p, "profile", Profiles.view(p))
 		end
@@ -7139,11 +7057,19 @@ RE_Action.OnServerEvent:Connect(function(p: Player, kind: any, data: any)
 		end
 		S.ready[p] = true
 		send(p, "profile", Profiles.view(p))
+		send(p, "votes", voteCounts())
 		if S.phase ~= "lobby" and S.track then
 			send(p, "setup", setupView(p))
 			if S.phase == "results" and S.lastResults then
 				send(p, "results", S.lastResults)
 			end
+		end
+		return
+	end
+	if kind == "vote" then
+		if S.phase == "lobby" and S.ready[p] and type(data) == "string" and table.find(Config.TRACK_ORDER, data) then
+			S.votes[p] = data
+			sendAll("votes", voteCounts())
 		end
 		return
 	end
@@ -7186,16 +7112,19 @@ RF_Shop.OnServerInvoke = function(p: Player, action: any, id: any)
 	if not prof then
 		return nil
 	end
-	local c = if type(id) == "string" then CHAR_BY_ID[id] else nil
-	if action == "buy" and c and not prof.owned[c.id] then
+	local c = if type(id) == "string" then Cars.byId[id] else nil
+	if action == "buy" and c and not prof.cars[c.id] then
 		if prof.coins >= c.price then
 			prof.coins -= c.price
-			prof.owned[c.id] = true
-			prof.selected = c.id
+			prof.cars[c.id] = true
+			prof.car = c.id
 			Profiles.save(p)
 		end
-	elseif action == "select" and c and prof.owned[c.id] then
-		prof.selected = c.id
+	elseif action == "select" and c and prof.cars[c.id] then
+		prof.car = c.id
+		Profiles.markDirty(p)
+	elseif action == "paint" and type(id) == "number" and Cars.paints[id] then
+		prof.paint = id
 		Profiles.markDirty(p)
 	end
 	return Profiles.view(p)
@@ -7212,6 +7141,7 @@ end
 
 Players.PlayerRemoving:Connect(function(p)
 	S.ready[p] = nil
+	S.votes[p] = nil
 	local r = S.byPlayer[p]
 	if r then
 		S.byPlayer[p] = nil
@@ -7230,7 +7160,6 @@ end)
 
 -- ---------------------------------------------------------------- главный цикл
 
-newGP()
 setPhase("lobby")
 
 local snapAcc = 0
@@ -7245,11 +7174,26 @@ RunService.Heartbeat:Connect(function(dt: number)
 	end
 
 	if S.phase == "lobby" then
-		if readyCount == 0 then
-			S.phaseStart = now() -- ждём первого игрока
+		local need = math.max(Config.MIN_PLAYERS, if Config.BOTS_SOLO > 0 then 1 else 2)
+		ReplicatedStorage:SetAttribute("SD_Need", need)
+		ReplicatedStorage:SetAttribute("SD_Players", readyCount)
+		if readyCount < need then
+			S.phaseStart = now() -- ждём игроков
 			ReplicatedStorage:SetAttribute("SD_PhaseStart", S.phaseStart)
-		elseif t >= Config.LOBBY_TIME then
-			startRace()
+		else
+			-- все проголосовали — не тянем
+			local voted = 0
+			for p in S.votes do
+				if p.Parent then
+					voted += 1
+				end
+			end
+			if voted >= readyCount and Config.LOBBY_TIME - t > 4 then
+				S.phaseStart = now() - (Config.LOBBY_TIME - 4)
+				ReplicatedStorage:SetAttribute("SD_PhaseStart", S.phaseStart)
+			elseif t >= Config.LOBBY_TIME then
+				startRace()
+			end
 		end
 		return
 	end
@@ -7276,13 +7220,16 @@ RunService.Heartbeat:Connect(function(dt: number)
 	if S.phase == "intro" or S.phase == "countdown" or S.phase == "race" then
 		local racing = S.phase == "race"
 		stepBots(dt, racing)
+		local hs = humans()
+		if #hs == 0 then
+			goLobby()
+			return
+		end
 		if racing then
 			updateItems(dt)
 			updateCoins(dt)
 			updateOrder()
-			-- конец гонки
-			local hs = humans()
-			local allDone = #hs > 0
+			local allDone = true
 			for _, h in hs do
 				if not h.finished then
 					allDone = false
@@ -7293,17 +7240,10 @@ RunService.Heartbeat:Connect(function(dt: number)
 			end
 			local tnow = now()
 			if
-				#hs == 0
-				or (S.allHumansDoneAt and tnow - S.allHumansDoneAt > 3)
+				(S.allHumansDoneAt and tnow - S.allHumansDoneAt > 3)
 				or (S.firstHumanFinish and tnow - S.firstHumanFinish > Config.FINISH_TIMEOUT)
 				or tnow - S.raceStart > Config.RACE_TIMEOUT
 			then
-				if #hs == 0 then
-					newGP()
-					setPhase("lobby")
-					sendAll("lobby", {})
-					return
-				end
 				results()
 			end
 		end
@@ -7313,18 +7253,8 @@ RunService.Heartbeat:Connect(function(dt: number)
 			snapshot()
 		end
 	elseif S.phase == "results" then
-		local final = S.raceNum >= #Config.TRACK_ORDER
-		if t >= (if final then Config.GP_RESULTS_TIME else Config.RESULTS_TIME) then
-			if readyCount == 0 then
-				newGP()
-				setPhase("lobby")
-			elseif final then
-				newGP()
-				setPhase("lobby")
-				sendAll("lobby", {})
-			else
-				startRace()
-			end
+		if t >= Config.RESULTS_TIME then
+			goLobby()
 		end
 	end
 end)
@@ -7341,7 +7271,7 @@ local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Config"))
-local Characters = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Characters"))
+local Cars = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Cars"))
 
 local Profiles = {}
 
@@ -7361,13 +7291,13 @@ local profiles: { [Player]: any } = {}
 local dirty: { [Player]: boolean } = {}
 
 local function defaults()
-	local owned = {}
-	for _, c in Characters do
+	local cars = {}
+	for _, c in Cars.list do
 		if c.price == 0 then
-			owned[c.id] = true
+			cars[c.id] = true
 		end
 	end
-	return { coins = 0, owned = owned, selected = "sakura", cups = 0, races = 0, wins = 0 }
+	return { coins = 0, cars = cars, car = Cars.list[1].id, paint = 1, trophies = 0, races = 0, wins = 0 }
 end
 
 local function key(p: Player): string
@@ -7394,12 +7324,46 @@ function Profiles.load(p: Player)
 		for k, v in data do
 			prof[k] = v
 		end
-		for id, v in defaults().owned do
-			prof.owned[id] = v
+		if type(prof.cars) ~= "table" then
+			prof.cars = {}
+		end
+		for id, v in defaults().cars do
+			prof.cars[id] = v
 		end
 	end
 	profiles[p] = prof
+	-- таблица лидеров Роблокса (список игроков): кубки и победы
+	local ls = Instance.new("Folder")
+	ls.Name = "leaderstats"
+	local tr = Instance.new("IntValue")
+	tr.Name = "Кубки"
+	tr.Value = prof.trophies
+	tr.Parent = ls
+	local w = Instance.new("IntValue")
+	w.Name = "Победы"
+	w.Value = prof.wins
+	w.Parent = ls
+	if p:FindFirstChild("leaderstats") then
+		(p:FindFirstChild("leaderstats") :: Instance):Destroy()
+	end
+	ls.Parent = p
 	return prof
+end
+
+--- Обновить значения в списке игроков.
+function Profiles.syncStats(p: Player)
+	local prof = profiles[p]
+	local ls = p:FindFirstChild("leaderstats")
+	if prof and ls then
+		local a = ls:FindFirstChild("Кубки")
+		local b = ls:FindFirstChild("Победы")
+		if a and a:IsA("IntValue") then
+			a.Value = prof.trophies
+		end
+		if b and b:IsA("IntValue") then
+			b.Value = prof.wins
+		end
+	end
 end
 
 function Profiles.get(p: Player)
@@ -7437,7 +7401,7 @@ function Profiles.view(p: Player)
 	if not prof then
 		return nil
 	end
-	return { coins = prof.coins, owned = prof.owned, selected = prof.selected, cups = prof.cups, races = prof.races, wins = prof.wins }
+	return { coins = prof.coins, cars = prof.cars, car = prof.car, paint = prof.paint, trophies = prof.trophies, races = prof.races, wins = prof.wins }
 end
 
 function Profiles.addCoins(p: Player, n: number)
@@ -7793,27 +7757,35 @@ end
         <Properties>
           <string name="Name">Hud</string>
           <string name="Source"><![CDATA[--!strict
--- Интерфейс: место и круг, скорость, шкала буста (3 деления), предмет с рулеткой, монеты, слипстрим,
--- обороты на старте с зелёной зоной, отсчёт и подсказки, мини-таблица мест, лобби и гараж гонщиков,
--- итоги гонки и Гран-при, сенсорные кнопки на телефоне.
+-- Интерфейс. Лобби: голосование за трассу, кошелёк и кубки, гараж (3D-превью машины, характеристики,
+-- краска). Гонка: верхняя плашка «место · круг · время», предмет и монеты справа, таблица мест слева,
+-- шкала буста и скорость снизу по центру, обороты на старте. Итоги заезда с кубками и монетами.
+-- Всё рисуется в «холсте» 1280×720 и масштабируется под экран (UIScale).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Characters = require(Shared:WaitForChild("Characters"))
+local Cars = require(Shared:WaitForChild("Cars"))
 local Layout = require(Shared:WaitForChild("Layout"))
 local Kart = require(Shared:WaitForChild("Kart"))
+local Tracks = require(Shared:WaitForChild("Tracks"))
+local Config = require(Shared:WaitForChild("Config"))
 local Input = require(script.Parent:WaitForChild("Input"))
+local KartModel = require(script.Parent:WaitForChild("KartModel"))
 
 local Hud = {}
 
 local PINK = Color3.fromRGB(255, 93, 147)
-local CYAN = Color3.fromRGB(57, 243, 255)
-local DARK = Color3.fromRGB(26, 20, 44)
+local PINK2 = Color3.fromRGB(255, 150, 90)
+local CYAN = Color3.fromRGB(57, 220, 255)
+local NAVY = Color3.fromRGB(20, 16, 38)
+local NAVY2 = Color3.fromRGB(44, 36, 78)
 local WHITE = Color3.new(1, 1, 1)
 local GOLD = Color3.fromRGB(255, 200, 40)
+local GREEN = Color3.fromRGB(60, 210, 120)
+local GREY = Color3.fromRGB(96, 90, 130)
 local NUM = Enum.Font.FredokaOne
 local TXT = Enum.Font.GothamBlack
 local TXT2 = Enum.Font.GothamBold
@@ -7838,8 +7810,12 @@ local function corner(r: number): UICorner
 	return new("UICorner", { CornerRadius = UDim.new(0, r) })
 end
 
-local function stroke(c: Color3, t: number): UIStroke
-	return new("UIStroke", { Color = c, Thickness = t, ApplyStrokeMode = Enum.ApplyStrokeMode.Border })
+local function stroke(c: Color3, t: number, tr: number?): UIStroke
+	return new("UIStroke", { Color = c, Thickness = t, Transparency = tr or 0, ApplyStrokeMode = Enum.ApplyStrokeMode.Border })
+end
+
+local function gradient(a: Color3, b: Color3, rot: number?): UIGradient
+	return new("UIGradient", { Color = ColorSequence.new(a, b), Rotation = rot or 90 })
 end
 
 local function label(props: { [string]: any }): TextLabel
@@ -7848,8 +7824,7 @@ local function label(props: { [string]: any }): TextLabel
 		TextColor3 = WHITE,
 		Font = TXT,
 		TextScaled = true,
-		TextStrokeTransparency = 0.4,
-		TextStrokeColor3 = DARK,
+		TextStrokeTransparency = 1,
 	}
 	for k, v in props do
 		p[k] = v
@@ -7857,315 +7832,510 @@ local function label(props: { [string]: any }): TextLabel
 	return new("TextLabel", p)
 end
 
-local function panel(props: { [string]: any }): Frame
-	local p = { BackgroundColor3 = DARK, BackgroundTransparency = 0.25, BorderSizePixel = 0 }
+--- Тёмная стеклянная панель со светлой кромкой.
+local function panel(props: { [string]: any }, radius: number?): Frame
+	local p = { BackgroundColor3 = NAVY, BackgroundTransparency = 0.18, BorderSizePixel = 0 }
 	for k, v in props do
 		p[k] = v
 	end
-	local f = new("Frame", p, { corner(12) })
-	return f
+	return new("Frame", p, { corner(radius or 14), stroke(WHITE, 1.5, 0.75) })
 end
 
-local function button(props: { [string]: any }, onClick: () -> ()): TextButton
+--- Кнопка с градиентом. UIGradient красит и текст самой кнопки, поэтому надпись — отдельным ярлыком.
+local function button(props: { [string]: any }, onClick: () -> (), colA: Color3?, colB: Color3?): TextButton
 	local p = {
-		BackgroundColor3 = PINK,
+		BackgroundColor3 = WHITE,
 		AutoButtonColor = true,
-		TextColor3 = WHITE,
-		Font = TXT,
-		TextScaled = true,
 		BorderSizePixel = 0,
 	}
+	local text = ""
 	for k, v in props do
-		p[k] = v
+		if k == "Text" then
+			text = v
+		else
+			p[k] = v
+		end
 	end
-	local b = new(
-		"TextButton",
-		p,
-		{
-			corner(10),
-			new("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }),
-		}
-	)
+	p.Text = ""
+	local b = new("TextButton", p, { corner(12), gradient(colA or PINK, colB or PINK2, 0) })
+	label({ Name = "Label", Size = UDim2.new(1, -20, 1, -14), Position = UDim2.fromOffset(10, 7), Text = text, ZIndex = (props.ZIndex or 1) + 1, Parent = b })
 	b.Activated:Connect(onClick)
 	return b
 end
 
-local gui: ScreenGui
-local E: { [string]: any } = {}
-local charById = {}
-for _, c in Characters do
-	charById[c.id] = c
+local function setBtnText(b: Instance, text: string)
+	local l = b:FindFirstChild("Label")
+	if l and l:IsA("TextLabel") then
+		l.Text = text
+	end
 end
 
+local E: { [string]: any } = {}
 local isTouch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local W, H = 1280, 720 -- размер холста
+
+local function fmtTime(t: number?): string
+	if not t then
+		return "—"
+	end
+	local m = math.floor(t / 60)
+	return string.format("%d:%05.2f", m, t - m * 60)
+end
+Hud.fmtTime = fmtTime
+
+-- ---------------------------------------------------------------- построение
 
 function Hud.init(callbacks)
+	E.cb = callbacks
 	local pg = Players.LocalPlayer:WaitForChild("PlayerGui")
-	gui = new("ScreenGui", { Name = "SakuraHud", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = pg })
-	E.callbacks = callbacks
+	local gui = new("ScreenGui", { Name = "SakuraHud", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = pg })
+	-- холст 1280×720 по центру, масштаб под экран
+	local canvas = new("Frame", { Name = "Canvas", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(W, H), BackgroundTransparency = 1, Parent = gui })
+	local scale = new("UIScale", { Parent = canvas })
+	local function fit()
+		local cam = workspace.CurrentCamera
+		local vs = if cam then cam.ViewportSize else Vector2.new(W, H)
+		local s = math.min(vs.X / W, vs.Y / H)
+		scale.Scale = math.max(0.35, s)
+		-- холст растягиваем на весь экран (в единицах холста), чтобы края прилипали к краям экрана
+		canvas.Size = UDim2.fromOffset(vs.X / scale.Scale, vs.Y / scale.Scale)
+	end
+	fit()
+	if workspace.CurrentCamera then
+		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
+	end
+	E.canvas = canvas
 
-	-- ---- гонка
-	local race = new("Frame", { Name = "Race", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, Parent = gui })
+	Hud.buildRace(canvas)
+	Hud.buildLobby(canvas)
+	Hud.buildGarage(canvas)
+	Hud.buildResults(canvas)
+
+	-- центр: отсчёт и подсказки
+	E.big = label({ AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(760, 120), Position = UDim2.new(0.5, 0, 0.2, 0), Font = NUM, Text = "", TextStrokeColor3 = PINK, TextStrokeTransparency = 0, Parent = canvas })
+	E.callouts = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(560, 130), Position = UDim2.new(0.5, 0, 0, 96), BackgroundTransparency = 1, Parent = canvas }, {
+		new("UIListLayout", { HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 4) }),
+	})
+	-- баннер (облёт трассы, зритель)
+	E.banner = panel({ AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(620, 104), Position = UDim2.new(0.5, 0, 0, 70), Visible = false, Parent = canvas }, 18)
+	E.bannerTitle = label({ Size = UDim2.new(1, -30, 0, 52), Position = UDim2.fromOffset(15, 8), Text = "", Parent = E.banner })
+	E.bannerSub = label({ Size = UDim2.new(1, -30, 0, 26), Position = UDim2.fromOffset(15, 66), Font = TXT2, Text = "", TextColor3 = Color3.fromRGB(210, 205, 235), Parent = E.banner })
+
+	if isTouch then
+		Hud.buildTouch(canvas)
+	end
+end
+
+function Hud.buildRace(canvas: Frame)
+	local race = new("Frame", { Name = "Race", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, Parent = canvas })
 	E.race = race
-	E.place = label({
-		Size = UDim2.fromOffset(150, 96),
-		Position = UDim2.fromOffset(18, 18),
-		Font = NUM,
-		Text = "1",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextColor3 = WHITE,
-		TextStrokeColor3 = PINK,
-		TextStrokeTransparency = 0,
-		Parent = race,
-	})
-	E.placeOf = label({
-		Size = UDim2.fromOffset(80, 34),
-		Position = UDim2.fromOffset(84, 66),
-		Font = NUM,
-		Text = "/8",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = race,
-	})
-	E.lap = label({
-		Size = UDim2.fromOffset(220, 30),
-		Position = UDim2.fromOffset(20, 116),
-		Text = "КРУГ 1/3",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = race,
-	})
-	E.time = label({
-		Size = UDim2.fromOffset(220, 24),
-		Position = UDim2.fromOffset(20, 146),
-		Font = NUM,
-		Text = "0:00.00",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = race,
-	})
 
-	-- мини-таблица мест
-	local board = new(
-		"Frame",
-		{ Size = UDim2.fromOffset(190, 8 * 22), Position = UDim2.fromOffset(18, 182), BackgroundTransparency = 1, Parent = race },
-		{ new("UIListLayout", { Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder }) }
-	)
-	E.board = board
+	-- верхняя плашка: место · круг · время
+	local bar = panel({ AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(430, 62), Position = UDim2.new(0.5, 0, 0, 14), Parent = race }, 31)
+	local badge = new("Frame", { Size = UDim2.fromOffset(110, 50), Position = UDim2.fromOffset(6, 6), BackgroundColor3 = WHITE, BorderSizePixel = 0, Parent = bar }, { corner(25), gradient(PINK, PINK2, 0) })
+	E.place = label({ Size = UDim2.fromOffset(52, 46), Position = UDim2.fromOffset(10, 2), Font = NUM, Text = "1", Parent = badge })
+	E.placeOf = label({ Size = UDim2.fromOffset(40, 24), Position = UDim2.fromOffset(62, 20), Font = NUM, Text = "/8", TextXAlignment = Enum.TextXAlignment.Left, Parent = badge })
+	E.lap = label({ Size = UDim2.fromOffset(150, 30), Position = UDim2.fromOffset(128, 16), Text = "КРУГ 1/3", Parent = bar })
+	new("Frame", { Size = UDim2.fromOffset(2, 30), Position = UDim2.fromOffset(288, 16), BackgroundColor3 = WHITE, BackgroundTransparency = 0.7, BorderSizePixel = 0, Parent = bar })
+	E.time = label({ Size = UDim2.fromOffset(120, 30), Position = UDim2.fromOffset(298, 16), Font = NUM, Text = "0:00.00", Parent = bar })
+
+	-- справа: предмет, монеты, слипстрим
+	local itemBox = panel({ AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(92, 92), Position = UDim2.new(1, -18, 0, 60), Parent = race }, 20)
+	E.itemBox = itemBox
+	E.itemIcon = label({ Size = UDim2.fromScale(0.74, 0.74), Position = UDim2.fromScale(0.13, 0.1), Font = NUM, Text = "", Parent = itemBox })
+	E.itemName = label({ AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(170, 18), Position = UDim2.new(1, 0, 1, 4), Font = TXT2, Text = "", TextXAlignment = Enum.TextXAlignment.Right, TextStrokeTransparency = 0.5, Parent = itemBox })
+	E.itemHint = label({ AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(60, 16), Position = UDim2.new(0, -6, 0, 38), Font = TXT2, Text = if isTouch then "" else "E", TextTransparency = 0.3, TextXAlignment = Enum.TextXAlignment.Right, Parent = itemBox })
+	local coinP = panel({ AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(120, 34), Position = UDim2.new(1, -18, 0, 182), Parent = race }, 17)
+	E.coins = label({ Size = UDim2.new(1, -16, 1, -8), Position = UDim2.fromOffset(8, 4), Font = NUM, Text = "● 0", TextColor3 = GOLD, Parent = coinP })
+	E.draftBar = panel({ AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(150, 12), Position = UDim2.new(1, -18, 0, 248), Visible = false, Parent = race }, 6)
+	E.draftFill = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(180, 240, 255), BorderSizePixel = 0, Parent = E.draftBar }, { corner(6) })
+	label({ Size = UDim2.fromOffset(150, 16), Position = UDim2.fromOffset(0, -19), Font = TXT2, Text = "СЛИПСТРИМ", TextColor3 = Color3.fromRGB(180, 240, 255), TextStrokeTransparency = 0.5, Parent = E.draftBar })
+
+	-- слева: таблица мест
+	local board = new("Frame", { AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(200, 8 * 27), Position = UDim2.new(0, 16, 0.52, 0), BackgroundTransparency = 1, Parent = race }, {
+		new("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
 	E.boardRows = {}
 	for i = 1, 8 do
-		local row = panel({ Size = UDim2.fromOffset(190, 20), LayoutOrder = i, BackgroundTransparency = 0.45, Parent = board })
-		local num = label({ Size = UDim2.fromOffset(22, 20), Font = NUM, Text = tostring(i), Parent = row })
-		local nm = label({
-			Size = UDim2.new(1, -30, 1, -4),
-			Position = UDim2.fromOffset(28, 2),
-			Font = TXT2,
-			Text = "",
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Parent = row,
-		})
-		E.boardRows[i] = { row = row, num = num, name = nm }
+		local row = new("Frame", { Size = UDim2.fromOffset(200, 24), LayoutOrder = i, BackgroundColor3 = NAVY, BackgroundTransparency = 0.3, BorderSizePixel = 0, Parent = board }, { corner(12) })
+		local chip = new("Frame", { Size = UDim2.fromOffset(24, 24), BackgroundColor3 = WHITE, BorderSizePixel = 0, Parent = row }, { corner(12) })
+		label({ Size = UDim2.fromScale(1, 1), Font = NUM, Text = tostring(i), TextColor3 = NAVY, Parent = chip })
+		local nm = label({ Size = UDim2.new(1, -38, 1, -6), Position = UDim2.fromOffset(32, 3), Font = TXT2, Text = "", TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		E.boardRows[i] = { row = row, chip = chip, name = nm }
 	end
 
-	-- предмет и монеты (справа сверху)
-	local itemBox = panel({ Size = UDim2.fromOffset(96, 96), Position = UDim2.new(1, -116, 0, 18), Parent = race }, {})
-	stroke(WHITE, 3).Parent = itemBox
-	E.itemBox = itemBox
-	E.itemIcon = label({ Size = UDim2.fromScale(0.8, 0.8), Position = UDim2.fromScale(0.1, 0.05), Font = NUM, Text = "", Parent = itemBox })
-	E.itemName = label({ Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 1, 2), Font = TXT2, Text = "", Parent = itemBox })
-	E.coins = label({
-		Size = UDim2.fromOffset(160, 32),
-		Position = UDim2.new(1, -180, 0, 140),
-		Font = NUM,
-		Text = "● 0",
-		TextColor3 = GOLD,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		Parent = race,
-	})
-	E.draftBar =
-		panel({ Size = UDim2.fromOffset(150, 10), Position = UDim2.new(1, -170, 0, 178), BackgroundTransparency = 0.4, Visible = false, Parent = race })
-	E.draftFill = new(
-		"Frame",
-		{ Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(180, 240, 255), BorderSizePixel = 0, Parent = E.draftBar },
-		{ corner(5) }
-	)
-	E.draftLabel = label({
-		Size = UDim2.fromOffset(150, 18),
-		Position = UDim2.fromOffset(0, -20),
-		Font = TXT2,
-		Text = "СЛИПСТРИМ",
-		TextColor3 = Color3.fromRGB(180, 240, 255),
-		Parent = E.draftBar,
-	})
-
-	-- скорость и шкала буста (внизу слева)
-	E.speed = label({
-		Size = UDim2.fromOffset(200, 58),
-		Position = UDim2.new(0, 22, 1, -150),
-		Font = NUM,
-		Text = "0",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = race,
-	})
-	E.speedUnit = label({
-		Size = UDim2.fromOffset(80, 22),
-		Position = UDim2.new(0, 24, 1, -94),
-		Font = TXT2,
-		Text = "км/ч",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = race,
-	})
-	local meter = new(
-		"Frame",
-		{ Size = UDim2.fromOffset(234, 24), Position = UDim2.new(0, 22, 1, -66), BackgroundTransparency = 1, Parent = race },
-		{ new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6) }) }
-	)
+	-- снизу по центру: скорость и шкала буста
+	local bottom = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Size = UDim2.fromOffset(330, 96), Position = UDim2.new(0.5, 0, 1, -14), BackgroundTransparency = 1, Parent = race })
+	E.bottom = bottom
+	E.speed = label({ Size = UDim2.fromOffset(150, 50), Position = UDim2.fromOffset(60, 0), Font = NUM, Text = "0", TextXAlignment = Enum.TextXAlignment.Right, TextStrokeTransparency = 0.3, TextStrokeColor3 = NAVY, Parent = bottom })
+	label({ Size = UDim2.fromOffset(60, 20), Position = UDim2.fromOffset(216, 24), Font = TXT2, Text = "км/ч", TextXAlignment = Enum.TextXAlignment.Left, TextStrokeTransparency = 0.5, Parent = bottom })
+	local meter = panel({ Size = UDim2.fromOffset(330, 36), Position = UDim2.fromOffset(0, 56), Parent = bottom }, 18)
 	E.meterSegs = {}
 	local segCol = { Color3.fromRGB(85, 184, 255), Color3.fromRGB(255, 165, 58), Color3.fromRGB(255, 85, 224) }
 	for i = 1, 3 do
-		local seg = panel({ Size = UDim2.fromOffset(74, 24), BackgroundTransparency = 0.35, Parent = meter })
-		stroke(WHITE, 2).Parent = seg
-		local fill = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = segCol[i], BorderSizePixel = 0, Parent = seg }, { corner(12) })
+		local seg = new("Frame", { Size = UDim2.fromOffset(86, 20), Position = UDim2.fromOffset(8 + (i - 1) * 92, 8), BackgroundColor3 = NAVY2, BorderSizePixel = 0, ClipsDescendants = true, Parent = meter }, { corner(10) })
+		local fill = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = segCol[i], BorderSizePixel = 0, Parent = seg }, { corner(10) })
 		E.meterSegs[i] = { seg = seg, fill = fill }
 	end
-	E.meterHint = label({
-		Size = UDim2.fromOffset(234, 18),
-		Position = UDim2.new(0, 22, 1, -38),
-		Font = TXT2,
-		Text = if isTouch then "БУСТ — кнопка ⚡" else "БУСТ — F / X",
-		TextTransparency = 0.2,
-		Parent = race,
-	})
+	E.meterKey = label({ Size = UDim2.fromOffset(38, 20), Position = UDim2.fromOffset(286, 8), Font = TXT, Text = if isTouch then "⚡" else "F", TextColor3 = GREY, Parent = meter })
 
 	-- обороты на старте
-	local rev = panel({ Size = UDim2.fromOffset(420, 44), Position = UDim2.new(0.5, -210, 1, -170), Visible = false, Parent = gui })
+	local rev = panel({ AnchorPoint = Vector2.new(0.5, 1), Size = UDim2.fromOffset(440, 50), Position = UDim2.new(0.5, 0, 1, -150), Visible = false, Parent = canvas }, 16)
 	E.rev = rev
+	local inner = new("Frame", { Size = UDim2.new(1, -20, 0, 22), Position = UDim2.fromOffset(10, 10), BackgroundColor3 = NAVY2, BorderSizePixel = 0, ClipsDescendants = true, Parent = rev }, { corner(8) })
 	local Z = Kart.PHYS.revZones
 	local function zone(a: number, b: number, c: Color3)
-		new("Frame", { Size = UDim2.new(b - a, 0, 1, -16), Position = UDim2.new(a, 0, 0, 8), BackgroundColor3 = c, BorderSizePixel = 0, Parent = rev })
+		new("Frame", { Size = UDim2.fromScale(b - a, 1), Position = UDim2.fromScale(a, 0), BackgroundColor3 = c, BorderSizePixel = 0, Parent = inner })
 	end
-	zone(0, Z.good, Color3.fromRGB(70, 70, 90))
-	zone(Z.good, Z.perfect, Color3.fromRGB(80, 200, 110))
-	zone(Z.perfect, Z.perfectTop, Color3.fromRGB(60, 255, 120))
-	zone(Z.perfectTop, Z.red, Color3.fromRGB(80, 200, 110))
+	zone(Z.good, Z.perfect, Color3.fromRGB(70, 170, 100))
+	zone(Z.perfect, Z.perfectTop, Color3.fromRGB(70, 255, 130))
+	zone(Z.perfectTop, Z.red, Color3.fromRGB(70, 170, 100))
 	zone(Z.red, 1, Color3.fromRGB(255, 60, 70))
-	E.revNeedle = new(
-		"Frame",
-		{ Size = UDim2.new(0, 6, 1, 6), Position = UDim2.new(0, -3, 0, -3), BackgroundColor3 = WHITE, BorderSizePixel = 0, Parent = rev },
-		{ corner(3) }
-	)
-	E.revCharge = new("Frame", { Size = UDim2.new(0, 0, 0, 5), Position = UDim2.new(0, 0, 1, 2), BackgroundColor3 = GOLD, BorderSizePixel = 0, Parent = rev })
-	E.revHint = label({
-		Size = UDim2.new(1, 0, 0, 22),
-		Position = UDim2.new(0, 0, 0, -26),
-		Font = TXT2,
-		Text = if isTouch
-			then "Держите ГАЗ в зелёной зоне — рывок на старте!"
-			else "Держите ↑/W в зелёной зоне — рывок на старте!",
-		Parent = rev,
-	})
+	E.revNeedle = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(6, 34), Position = UDim2.new(0, 10, 0, 4), BackgroundColor3 = WHITE, BorderSizePixel = 0, Parent = rev }, { corner(3) })
+	E.revInnerW = 420
+	E.revCharge = new("Frame", { Size = UDim2.fromOffset(0, 5), Position = UDim2.fromOffset(10, 38), BackgroundColor3 = GOLD, BorderSizePixel = 0, Parent = rev }, { corner(2) })
+	label({ AnchorPoint = Vector2.new(0.5, 1), Size = UDim2.fromOffset(520, 22), Position = UDim2.new(0.5, 0, 0, -6), Font = TXT2, Text = if isTouch then "Держите ГАЗ в зелёной зоне — рывок на старте!" else "Держите W в зелёной зоне — рывок на старте!", TextStrokeTransparency = 0.4, Parent = rev })
+end
 
-	-- центр: отсчёт и подсказки
-	E.big = label({
-		Size = UDim2.fromOffset(600, 140),
-		Position = UDim2.new(0.5, -300, 0.22, 0),
-		Font = NUM,
-		Text = "",
-		TextColor3 = WHITE,
-		TextStrokeColor3 = PINK,
-		TextStrokeTransparency = 0,
-		Parent = gui,
-	})
-	E.callouts = new(
-		"Frame",
-		{ Size = UDim2.fromOffset(520, 120), Position = UDim2.new(0.5, -260, 0, 14), BackgroundTransparency = 1, Parent = gui },
-		{ new("UIListLayout", { HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 4) }) }
-	)
+-- ---------------------------------------------------------------- лобби
 
-	-- баннер фазы (лобби/облёт/зритель)
-	E.banner = panel({ Size = UDim2.fromOffset(560, 110), Position = UDim2.new(0.5, -280, 0, 70), Visible = false, Parent = gui })
-	E.bannerTitle = label({
-		Size = UDim2.new(1, -20, 0, 54),
-		Position = UDim2.fromOffset(10, 8),
-		Text = "",
-		TextColor3 = WHITE,
-		TextStrokeColor3 = PINK,
-		TextStrokeTransparency = 0,
-		Parent = E.banner,
-	})
-	E.bannerSub = label({ Size = UDim2.new(1, -20, 0, 32), Position = UDim2.fromOffset(10, 66), Font = TXT2, Text = "", Parent = E.banner })
+function Hud.buildLobby(canvas: Frame)
+	local lobby = new("Frame", { Name = "Lobby", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, Parent = canvas })
+	E.lobby = lobby
+	-- логотип
+	label({ AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(620, 70), Position = UDim2.new(0.5, 0, 0, 56), Font = NUM, Text = "SAKURA DRIFT", TextStrokeColor3 = PINK, TextStrokeTransparency = 0, Parent = lobby })
+	E.lobbySub = label({ AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(620, 24), Position = UDim2.new(0.5, 0, 0, 128), Font = TXT2, Text = "ОНЛАЙН-ГОНКИ", TextStrokeTransparency = 0.4, Parent = lobby })
 
-	-- кошелёк и гараж
-	E.wallet = label({
-		Size = UDim2.fromOffset(200, 30),
-		Position = UDim2.new(1, -220, 1, -48),
-		Font = NUM,
-		Text = "● 0",
-		TextColor3 = GOLD,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		Visible = false,
-		Parent = gui,
-	})
-	E.garageBtn = button(
-		{ Size = UDim2.fromOffset(200, 50), Position = UDim2.new(1, -220, 1, -110), Text = "ГАРАЖ", Visible = false, Parent = gui },
-		function()
-			Hud.openGarage(not E.garage.Visible)
-		end
-	)
-	Hud.buildGarage()
+	-- кошелёк и кубки (справа сверху)
+	local stat = panel({ AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(250, 44), Position = UDim2.new(1, -18, 0, 60), Parent = lobby }, 22)
+	E.wallet = label({ Size = UDim2.fromOffset(110, 28), Position = UDim2.fromOffset(12, 8), Font = NUM, Text = "● 0", TextColor3 = GOLD, Parent = stat })
+	E.trophies = label({ Size = UDim2.fromOffset(110, 28), Position = UDim2.fromOffset(128, 8), Font = NUM, Text = "🏆 0", TextColor3 = WHITE, Parent = stat })
 
-	-- итоги
-	E.results =
-		panel({ Size = UDim2.fromOffset(620, 470), Position = UDim2.new(0.5, -310, 0.5, -235), Visible = false, BackgroundTransparency = 0.12, Parent = gui })
-	stroke(PINK, 3).Parent = E.results
-	E.resTitle = label({
-		Size = UDim2.new(1, -20, 0, 46),
-		Position = UDim2.fromOffset(10, 10),
-		Text = "ИТОГИ",
-		TextColor3 = WHITE,
-		TextStrokeColor3 = PINK,
-		TextStrokeTransparency = 0,
-		Parent = E.results,
-	})
-	E.resList = new(
-		"Frame",
-		{ Size = UDim2.new(1, -30, 0, 8 * 34), Position = UDim2.fromOffset(15, 62), BackgroundTransparency = 1, Parent = E.results },
-		{ new("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }) }
-	)
-	E.resReward = label({ Size = UDim2.new(1, -30, 0, 28), Position = UDim2.new(0, 15, 1, -96), Font = TXT2, Text = "", TextColor3 = GOLD, Parent = E.results })
-	E.resNext = label({ Size = UDim2.new(1, -30, 0, 24), Position = UDim2.new(0, 15, 1, -60), Font = TXT2, Text = "", Parent = E.results })
-
-	if isTouch then
-		Hud.buildTouch()
+	-- голосование
+	local vote = panel({ AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(880, 300), Position = UDim2.new(0.5, 0, 0.5, 10), Parent = lobby }, 22)
+	E.voteTitle = label({ Size = UDim2.new(1, -40, 0, 32), Position = UDim2.fromOffset(20, 14), Text = "ГОЛОСУЙТЕ ЗА ТРАССУ", Parent = vote })
+	E.voteCards = {}
+	for i, id in Config.TRACK_ORDER do
+		local d = Tracks.data[id]
+		local card = new("TextButton", { Size = UDim2.fromOffset(200, 170), Position = UDim2.fromOffset(20 + (i - 1) * 213, 60), BackgroundColor3 = WHITE, Text = "", AutoButtonColor = true, BorderSizePixel = 0, Parent = vote }, {
+			corner(16),
+			gradient(Color3.fromHex(d.card[1]), Color3.fromHex(d.card[2]), 60),
+		})
+		local st = stroke(WHITE, 4, 1)
+		st.Parent = card
+		label({ Size = UDim2.new(1, -16, 0, 44), Position = UDim2.fromOffset(8, 14), Font = NUM, Text = d.jp, TextStrokeTransparency = 0.6, TextStrokeColor3 = NAVY, Parent = card })
+		label({ Size = UDim2.new(1, -16, 0, 26), Position = UDim2.fromOffset(8, 66), Text = d.name, TextStrokeTransparency = 0.5, TextStrokeColor3 = NAVY, Parent = card })
+		label({ Size = UDim2.new(1, -16, 0, 18), Position = UDim2.fromOffset(8, 96), Font = TXT2, Text = d.time, TextStrokeTransparency = 0.6, TextStrokeColor3 = NAVY, Parent = card })
+		local badge = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Size = UDim2.fromOffset(120, 30), Position = UDim2.new(0.5, 0, 1, -10), BackgroundColor3 = NAVY, BackgroundTransparency = 0.25, BorderSizePixel = 0, Parent = card }, { corner(15) })
+		local cnt = label({ Size = UDim2.new(1, -10, 1, -8), Position = UDim2.fromOffset(5, 4), Font = TXT2, Text = "0 голосов", Parent = badge })
+		card.Activated:Connect(function()
+			E.myVote = id
+			E.cb.vote(id)
+			Hud.refreshVotes()
+		end)
+		E.voteCards[id] = { card = card, stroke = st, count = cnt }
 	end
+	E.lobbyTimer = label({ Size = UDim2.new(1, -40, 0, 34), Position = UDim2.new(0, 20, 1, -52), Font = TXT, Text = "", TextColor3 = GOLD, Parent = vote })
+
+	-- моя машина и гараж (снизу)
+	local mine = panel({ AnchorPoint = Vector2.new(0.5, 1), Size = UDim2.fromOffset(520, 70), Position = UDim2.new(0.5, 0, 1, -22), Parent = lobby }, 22)
+	E.myCarChip = new("Frame", { Size = UDim2.fromOffset(46, 46), Position = UDim2.fromOffset(12, 12), BackgroundColor3 = PINK, BorderSizePixel = 0, Parent = mine }, { corner(23), stroke(WHITE, 2, 0.3) })
+	E.myCarName = label({ Size = UDim2.fromOffset(250, 28), Position = UDim2.fromOffset(70, 10), Text = "", TextXAlignment = Enum.TextXAlignment.Left, Parent = mine })
+	E.myCarClass = label({ Size = UDim2.fromOffset(250, 18), Position = UDim2.fromOffset(70, 40), Font = TXT2, Text = "", TextColor3 = Color3.fromRGB(200, 195, 230), TextXAlignment = Enum.TextXAlignment.Left, Parent = mine })
+	button({ AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(170, 48), Position = UDim2.new(1, -12, 0.5, 0), Text = "ГАРАЖ", Parent = mine }, function()
+		Hud.openGarage(true)
+	end)
+end
+
+function Hud.refreshVotes()
+	local counts = E.votes or {}
+	for id, c in E.voteCards do
+		local n = counts[id] or 0
+		c.count.Text = string.format("%d %s", n, if n == 1 then "голос" elseif n >= 2 and n <= 4 then "голоса" else "голосов")
+		c.stroke.Transparency = if E.myVote == id then 0 else 1
+	end
+end
+
+function Hud.setVotes(counts)
+	E.votes = counts
+	Hud.refreshVotes()
+end
+
+--- Лобби каждый кадр: сколько до старта / кого ждём.
+function Hud.lobby(left: number, players: number, need: number)
+	if players < need then
+		E.lobbyTimer.Text = string.format("Ждём игроков: %d / %d", players, need)
+	else
+		E.lobbyTimer.Text = string.format("Старт через %d с", left)
+	end
+	E.lobbySub.Text = if players >= 2 then string.format("ОНЛАЙН-ГОНКА · ИГРОКОВ: %d", players) elseif Config.BOTS_SOLO > 0 then "ВЫ ОДИН НА СЕРВЕРЕ — ЗАЕЗД С БОТАМИ (КУБКИ НЕ РАЗЫГРЫВАЮТСЯ)" else "ОНЛАЙН-ГОНКИ"
+end
+
+function Hud.resetVote()
+	E.myVote = nil
+	E.votes = {}
+	Hud.refreshVotes()
+end
+
+-- ---------------------------------------------------------------- гараж
+
+local function statBar(parent: Instance, y: number, name: string): Frame
+	label({ Size = UDim2.fromOffset(110, 18), Position = UDim2.fromOffset(0, y), Font = TXT2, Text = name, TextXAlignment = Enum.TextXAlignment.Left, Parent = parent })
+	local bar = new("Frame", { Size = UDim2.new(1, -120, 0, 12), Position = UDim2.fromOffset(120, y + 3), BackgroundColor3 = NAVY2, BorderSizePixel = 0, Parent = parent }, { corner(6) })
+	return new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = WHITE, BorderSizePixel = 0, Parent = bar }, { corner(6), gradient(CYAN, PINK, 0) })
+end
+
+function Hud.buildGarage(canvas: Frame)
+	local g = new("Frame", { Name = "Garage", AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(1000, 560), Position = UDim2.fromScale(0.5, 0.52), BackgroundColor3 = NAVY, BackgroundTransparency = 0.04, BorderSizePixel = 0, Visible = false, ZIndex = 20, Parent = canvas }, { corner(24), stroke(PINK, 3) })
+	E.garage = g
+	label({ Size = UDim2.fromOffset(300, 40), Position = UDim2.fromOffset(24, 16), Text = "ГАРАЖ", TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 21, Parent = g })
+	E.garageWallet = label({ AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(200, 32), Position = UDim2.new(1, -90, 0, 20), Font = NUM, Text = "● 0", TextColor3 = GOLD, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 21, Parent = g })
+	button({ AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(46, 46), Position = UDim2.new(1, -18, 0, 14), Text = "✕", ZIndex = 21, Parent = g }, function()
+		Hud.openGarage(false)
+	end, GREY, GREY)
+
+	-- слева: список машин
+	local list = new("ScrollingFrame", { Size = UDim2.fromOffset(280, 470), Position = UDim2.fromOffset(20, 72), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 5, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 21, Parent = g }, {
+		new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
+	E.carRows = {}
+	for i, c in Cars.list do
+		local row = new("TextButton", { Size = UDim2.fromOffset(268, 52), LayoutOrder = i, BackgroundColor3 = NAVY2, Text = "", AutoButtonColor = true, BorderSizePixel = 0, ZIndex = 21, Parent = list }, { corner(12) })
+		local st = stroke(PINK, 3, 1)
+		st.Parent = row
+		label({ Size = UDim2.fromOffset(170, 24), Position = UDim2.fromOffset(12, 6), Text = c.name, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22, Parent = row })
+		label({ Size = UDim2.fromOffset(170, 16), Position = UDim2.fromOffset(12, 31), Font = TXT2, Text = c.class, TextColor3 = Color3.fromRGB(190, 185, 225), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22, Parent = row })
+		local tag = label({ AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(80, 22), Position = UDim2.new(1, -10, 0.5, 0), Font = NUM, Text = "", TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 22, Parent = row })
+		row.Activated:Connect(function()
+			E.viewCar = c.id
+			Hud.refreshGarage()
+		end)
+		E.carRows[c.id] = { row = row, stroke = st, tag = tag }
+	end
+
+	-- центр: 3D-превью
+	local vp = new("ViewportFrame", { Size = UDim2.fromOffset(400, 330), Position = UDim2.fromOffset(312, 72), BackgroundColor3 = NAVY2, BackgroundTransparency = 0.2, BorderSizePixel = 0, Ambient = Color3.fromRGB(170, 170, 190), LightColor = WHITE, LightDirection = Vector3.new(-1, -2, -1), ZIndex = 21, Parent = g }, { corner(18) })
+	local cam = Instance.new("Camera")
+	cam.FieldOfView = 35
+	cam.Parent = vp
+	vp.CurrentCamera = cam
+	E.vp = vp
+	E.vpCam = cam
+	-- краски
+	label({ Size = UDim2.fromOffset(400, 18), Position = UDim2.fromOffset(312, 412), Font = TXT2, Text = "ЦВЕТ", TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 21, Parent = g })
+	E.swatches = {}
+	for i, pt in Cars.paints do
+		local sw = new("TextButton", { Size = UDim2.fromOffset(34, 34), Position = UDim2.fromOffset(312 + (i - 1) * 40, 436), BackgroundColor3 = Color3.fromHex(pt.color), Text = "", AutoButtonColor = true, BorderSizePixel = 0, ZIndex = 21, Parent = g }, { corner(17) })
+		local st = stroke(WHITE, 3, 1)
+		st.Parent = sw
+		sw.Activated:Connect(function()
+			E.cb.paint(i)
+		end)
+		E.swatches[i] = st
+	end
+
+	-- справа: характеристики и кнопка
+	local info = new("Frame", { Size = UDim2.fromOffset(252, 470), Position = UDim2.fromOffset(728, 72), BackgroundTransparency = 1, ZIndex = 21, Parent = g })
+	E.gName = label({ Size = UDim2.new(1, 0, 0, 36), Text = "", TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 21, Parent = info })
+	E.gClass = label({ Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 40), Font = TXT2, Text = "", TextColor3 = CYAN, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 21, Parent = info })
+	E.gDesc = label({ Size = UDim2.new(1, 0, 0, 44), Position = UDim2.fromOffset(0, 68), Font = TXT2, Text = "", TextScaled = false, TextSize = 16, TextWrapped = true, TextColor3 = Color3.fromRGB(210, 205, 235), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 21, Parent = info })
+	E.gStats = {
+		speed = statBar(info, 130, "СКОРОСТЬ"),
+		accel = statBar(info, 160, "РАЗГОН"),
+		handling = statBar(info, 190, "УПРАВЛЕНИЕ"),
+	}
+	for _, d in info:GetDescendants() do
+		if d:IsA("GuiObject") then
+			d.ZIndex = 21
+		end
+	end
+	E.gBtn = button({ AnchorPoint = Vector2.new(0, 1), Size = UDim2.new(1, 0, 0, 56), Position = UDim2.new(0, 0, 1, -40), Text = "", ZIndex = 21, Parent = info }, function()
+		local prof = E.profile
+		local id = E.viewCar
+		if not prof or not id then
+			return
+		end
+		if prof.cars[id] then
+			E.cb.select(id)
+		else
+			E.cb.buy(id)
+		end
+	end)
+	E.gBtnGrad = E.gBtn:FindFirstChildOfClass("UIGradient")
+	E.gNote = label({ AnchorPoint = Vector2.new(0, 1), Size = UDim2.new(1, 0, 0, 20), Position = UDim2.new(0, 0, 1, -10), Font = TXT2, Text = "", TextColor3 = Color3.fromRGB(200, 195, 230), ZIndex = 21, Parent = info })
+end
+
+function Hud.openGarage(on: boolean)
+	if on and E.profile then
+		E.viewCar = E.profile.car
+	end
+	E.garage.Visible = on
+	if on then
+		Hud.refreshGarage()
+	end
+end
+
+function Hud.refreshGarage()
+	local prof = E.profile
+	if not prof then
+		return
+	end
+	local id = E.viewCar or prof.car
+	local car = Cars.get(id)
+	E.garageWallet.Text = "● " .. tostring(prof.coins)
+	for cid, r in E.carRows do
+		local c = Cars.get(cid)
+		r.stroke.Transparency = if cid == car.id then 0 else 1
+		if prof.car == cid then
+			r.tag.Text = "ВЫБРАНА"
+			r.tag.TextColor3 = GREEN
+		elseif prof.cars[cid] then
+			r.tag.Text = ""
+		else
+			r.tag.Text = "● " .. tostring(c.price)
+			r.tag.TextColor3 = GOLD
+		end
+	end
+	E.gName.Text = car.name
+	E.gClass.Text = string.upper(car.class)
+	E.gDesc.Text = car.desc
+	for k, bar in E.gStats do
+		bar.Size = UDim2.fromScale(car.stats[k] / 5, 1)
+	end
+	for i, st in E.swatches do
+		st.Transparency = if i == prof.paint then 0 else 1
+	end
+	local grad = E.gBtnGrad
+	if prof.car == car.id then
+		setBtnText(E.gBtn, "ВЫБРАНА")
+		E.gNote.Text = ""
+		if grad then
+			grad.Color = ColorSequence.new(GREEN, GREEN)
+		end
+	elseif prof.cars[car.id] then
+		setBtnText(E.gBtn, "ВЫБРАТЬ")
+		E.gNote.Text = ""
+		if grad then
+			grad.Color = ColorSequence.new(PINK, PINK2)
+		end
+	else
+		setBtnText(E.gBtn, "КУПИТЬ  ● " .. tostring(car.price))
+		local enough = prof.coins >= car.price
+		E.gNote.Text = if enough then "" else string.format("Не хватает %d монет", car.price - prof.coins)
+		if grad then
+			grad.Color = if enough then ColorSequence.new(GOLD, PINK2) else ColorSequence.new(GREY, GREY)
+		end
+	end
+	-- 3D-превью: пересобираем модель при смене машины или краски
+	local key = car.id .. ":" .. tostring(prof.paint)
+	if E.vpKey ~= key then
+		E.vpKey = key
+		if E.vpModel then
+			E.vpModel:destroy()
+		end
+		local m = KartModel.new(car, Color3.fromHex(Cars.paint(prof.paint).color), nil, true)
+		m.root.CFrame = CFrame.new(0, 0, 0)
+		m:setParent(E.vp)
+		E.vpModel = m
+	end
+end
+
+function Hud.setProfile(prof)
+	if not prof then
+		return
+	end
+	E.profile = prof
+	E.wallet.Text = "● " .. tostring(prof.coins)
+	E.trophies.Text = "🏆 " .. tostring(prof.trophies or 0)
+	local car = Cars.get(prof.car)
+	E.myCarName.Text = car.name
+	E.myCarClass.Text = car.class .. " · " .. Cars.paint(prof.paint).name
+	E.myCarChip.BackgroundColor3 = Color3.fromHex(Cars.paint(prof.paint).color)
+	if E.garage.Visible then
+		Hud.refreshGarage()
+	end
+end
+
+--- Раз в кадр: вращение машины в превью.
+function Hud.tick(dt: number)
+	if E.garage.Visible and E.vpCam then
+		E.vpAngle = (E.vpAngle or 0) + dt * 0.6
+		local a = E.vpAngle
+		local sc = Config.SCALE
+		local center = Vector3.new(0, 0.7 * sc, 0)
+		local pos = center + Vector3.new(math.cos(a) * 7.2 * sc, 2.6 * sc, math.sin(a) * 7.2 * sc)
+		E.vpCam.CFrame = CFrame.lookAt(pos, center)
+	end
+end
+
+-- ---------------------------------------------------------------- итоги
+
+function Hud.buildResults(canvas: Frame)
+	local r = new("Frame", { Name = "Results", AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(680, 500), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = NAVY, BackgroundTransparency = 0.06, BorderSizePixel = 0, Visible = false, ZIndex = 10, Parent = canvas }, { corner(24), stroke(PINK, 3) })
+	E.results = r
+	E.resTitle = label({ Size = UDim2.new(1, -40, 0, 44), Position = UDim2.fromOffset(20, 14), Text = "ИТОГИ ЗАЕЗДА", ZIndex = 11, Parent = r })
+	E.resSub = label({ Size = UDim2.new(1, -40, 0, 20), Position = UDim2.fromOffset(20, 58), Font = TXT2, Text = "", TextColor3 = CYAN, ZIndex = 11, Parent = r })
+	E.resList = new("Frame", { Size = UDim2.new(1, -40, 0, 8 * 37), Position = UDim2.fromOffset(20, 88), BackgroundTransparency = 1, ZIndex = 11, Parent = r }, {
+		new("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
+	E.resReward = label({ Size = UDim2.new(1, -40, 0, 30), Position = UDim2.new(0, 20, 1, -84), Font = TXT, Text = "", TextColor3 = GOLD, ZIndex = 11, Parent = r })
+	E.resNext = label({ Size = UDim2.new(1, -40, 0, 20), Position = UDim2.new(0, 20, 1, -42), Font = TXT2, Text = "Возвращаемся в лобби…", TextColor3 = Color3.fromRGB(200, 195, 230), ZIndex = 11, Parent = r })
+end
+
+--- data: { list = {{id,name,carId,paint,place,time,finished,isBot,trophies}}, pvp, trackId }
+function Hud.showResults(data, myId: number)
+	for _, c in E.resList:GetChildren() do
+		if c:IsA("Frame") then
+			c:Destroy()
+		end
+	end
+	local d = Tracks.data[data.trackId]
+	E.resSub.Text = (if d then d.name else "") .. (if data.pvp then " · ОНЛАЙН-ЗАЕЗД" else " · ЗАЕЗД С БОТАМИ")
+	for _, r in data.list do
+		local me = r.id == myId
+		local row = new("Frame", { Size = UDim2.new(1, 0, 0, 33), LayoutOrder = r.place, BackgroundColor3 = if me then PINK else NAVY2, BackgroundTransparency = if me then 0 else 0.2, BorderSizePixel = 0, ZIndex = 11, Parent = E.resList }, { corner(16) })
+		local chip = new("Frame", { Size = UDim2.fromOffset(33, 33), BackgroundColor3 = if r.place == 1 then GOLD elseif r.place == 2 then Color3.fromRGB(205, 210, 225) elseif r.place == 3 then Color3.fromRGB(220, 150, 90) else WHITE, BorderSizePixel = 0, ZIndex = 12, Parent = row }, { corner(16) })
+		label({ Size = UDim2.fromScale(1, 1), Font = NUM, Text = tostring(r.place), TextColor3 = NAVY, ZIndex = 13, Parent = chip })
+		new("Frame", { Size = UDim2.fromOffset(14, 14), Position = UDim2.fromOffset(44, 10), BackgroundColor3 = Color3.fromHex(Cars.paint(r.paint).color), BorderSizePixel = 0, ZIndex = 12, Parent = row }, { corner(7) })
+		label({ Size = UDim2.fromOffset(250, 22), Position = UDim2.fromOffset(66, 5), Font = TXT2, Text = r.name, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12, Parent = row })
+		label({ Size = UDim2.fromOffset(120, 16), Position = UDim2.fromOffset(322, 9), Font = TXT2, Text = Cars.get(r.carId).name, TextColor3 = Color3.fromRGB(215, 210, 240), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12, Parent = row })
+		label({ Size = UDim2.fromOffset(100, 22), Position = UDim2.new(1, -190, 0, 5), Font = NUM, Text = if r.finished then fmtTime(r.time) else "—", ZIndex = 12, Parent = row })
+		local tr = ""
+		if data.pvp and not r.isBot then
+			tr = string.format("%s%d 🏆", if r.trophies >= 0 then "+" else "", r.trophies)
+		end
+		label({ Size = UDim2.fromOffset(78, 22), Position = UDim2.new(1, -86, 0, 5), Font = NUM, Text = tr, TextColor3 = if r.trophies >= 0 then WHITE else Color3.fromRGB(255, 190, 190), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 12, Parent = row })
+	end
+	E.resReward.Text = ""
+end
+
+function Hud.showReward(rw)
+	local parts = { string.format("Монеты на трассе: %d", rw.collected), string.format("За место: +%d", rw.placeBonus) }
+	local s = table.concat(parts, "   ·   ") .. string.format("   =   ● %d", rw.total)
+	if rw.pvp then
+		s ..= string.format("      %s%d 🏆", if rw.trophies >= 0 then "+" else "", rw.trophies)
+	end
+	E.resReward.Text = s
 end
 
 -- ---------------------------------------------------------------- сенсорные кнопки
 
-function Hud.buildTouch()
-	local t = new("Frame", { Name = "Touch", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, Parent = gui })
+function Hud.buildTouch(canvas: Frame)
+	local t = new("Frame", { Name = "Touch", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, Parent = canvas })
 	E.touch = t
-	local function hold(text: string, pos: UDim2, size: number, color: Color3, onDown: () -> (), onUp: () -> ())
-		local b = new(
-			"TextButton",
-			{
-				Size = UDim2.fromOffset(size, size),
-				Position = pos,
-				Text = text,
-				BackgroundColor3 = color,
-				BackgroundTransparency = 0.25,
-				TextColor3 = WHITE,
-				Font = TXT,
-				TextScaled = true,
-				AutoButtonColor = false,
-				Parent = t,
-			},
-			{ new("UICorner", { CornerRadius = UDim.new(1, 0) }), stroke(WHITE, 2) }
-		)
+	local function hold(text: string, anchor: Vector2, pos: UDim2, size: number, color: Color3, onDown: () -> (), onUp: () -> ())
+		local b = new("TextButton", { AnchorPoint = anchor, Size = UDim2.fromOffset(size, size), Position = pos, Text = text, BackgroundColor3 = color, BackgroundTransparency = 0.25, TextColor3 = WHITE, Font = TXT, TextScaled = true, AutoButtonColor = false, Parent = t }, {
+			new("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			stroke(WHITE, 2, 0.4),
+			new("UIPadding", { PaddingTop = UDim.new(0.22, 0), PaddingBottom = UDim.new(0.22, 0), PaddingLeft = UDim.new(0.12, 0), PaddingRight = UDim.new(0.12, 0) }),
+		})
 		b.InputBegan:Connect(function(io)
-			if io.UserInputType == Enum.UserInputType.Touch then
+			if io.UserInputType == Enum.UserInputType.Touch or io.UserInputType == Enum.UserInputType.MouseButton1 then
 				onDown()
 			end
 		end)
 		b.InputEnded:Connect(function(io)
-			if io.UserInputType == Enum.UserInputType.Touch then
+			if io.UserInputType == Enum.UserInputType.Touch or io.UserInputType == Enum.UserInputType.MouseButton1 then
 				onUp()
 			end
 		end)
@@ -8175,191 +8345,43 @@ function Hud.buildTouch()
 	local function upd()
 		tch.steer = (if right then 1 else 0) - (if left then 1 else 0)
 	end
-	hold("◀", UDim2.new(0, 24, 1, -130), 100, DARK, function()
+	local BL, BR = Vector2.new(0, 1), Vector2.new(1, 1)
+	hold("◀", BL, UDim2.new(0, 28, 1, -30), 120, NAVY, function()
 		left = true
 		upd()
 	end, function()
 		left = false
 		upd()
 	end)
-	hold("▶", UDim2.new(0, 140, 1, -130), 100, DARK, function()
+	hold("▶", BL, UDim2.new(0, 164, 1, -30), 120, NAVY, function()
 		right = true
 		upd()
 	end, function()
 		right = false
 		upd()
 	end)
-	hold("ГАЗ", UDim2.new(1, -130, 1, -140), 110, Color3.fromRGB(60, 200, 110), function()
+	hold("ГАЗ", BR, UDim2.new(1, -28, 1, -30), 130, GREEN, function()
 		tch.gas = true
 	end, function()
 		tch.gas = false
 	end)
-	hold("ТОРМ", UDim2.new(1, -230, 1, -100), 80, Color3.fromRGB(120, 120, 140), function()
+	hold("ТОРМ", BR, UDim2.new(1, -170, 1, -24), 90, GREY, function()
 		tch.brake = true
 	end, function()
 		tch.brake = false
 	end)
-	hold("ДРИФТ", UDim2.new(1, -240, 1, -200), 90, PINK, function()
+	hold("ДРИФТ", BR, UDim2.new(1, -150, 1, -150), 104, PINK, function()
 		tch.drift = true
 		Input.press("drift")
 	end, function()
 		tch.drift = false
 	end)
-	hold("⚡", UDim2.new(1, -120, 1, -240), 80, Color3.fromRGB(85, 184, 255), function()
+	hold("⚡", BR, UDim2.new(1, -28, 1, -172), 90, Color3.fromRGB(85, 184, 255), function()
 		Input.press("boost")
 	end, function() end)
-	hold("✦", UDim2.new(1, -330, 1, -170), 80, Color3.fromRGB(160, 90, 255), function()
+	hold("✦", BR, UDim2.new(1, -262, 1, -110), 86, Color3.fromRGB(160, 90, 255), function()
 		Input.press("item")
 	end, function() end)
-	-- на телефоне шкала и скорость — повыше, чтобы не мешали кнопки
-	E.speed.Position = UDim2.new(0, 22, 1, -260)
-	E.speedUnit.Position = UDim2.new(0, 24, 1, -204)
-	E.meterSegs[1].seg.Parent.Position = UDim2.new(0, 22, 1, -176)
-	E.meterHint.Visible = false
-end
-
--- ---------------------------------------------------------------- гараж
-
-function Hud.buildGarage()
-	local g =
-		panel({ Size = UDim2.fromOffset(720, 440), Position = UDim2.new(0.5, -360, 0.5, -220), Visible = false, BackgroundTransparency = 0.08, Parent = gui })
-	stroke(PINK, 3).Parent = g
-	E.garage = g
-	label({
-		Size = UDim2.new(1, -20, 0, 42),
-		Position = UDim2.fromOffset(10, 8),
-		Text = "ГАРАЖ — ВЫБОР ГОНЩИКА",
-		TextColor3 = WHITE,
-		TextStrokeColor3 = PINK,
-		TextStrokeTransparency = 0,
-		Parent = g,
-	})
-	E.garageWallet = label({
-		Size = UDim2.fromOffset(200, 26),
-		Position = UDim2.new(1, -220, 0, 14),
-		Font = NUM,
-		Text = "● 0",
-		TextColor3 = GOLD,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		Parent = g,
-	})
-	local grid = new(
-		"ScrollingFrame",
-		{
-			Size = UDim2.new(1, -24, 1, -110),
-			Position = UDim2.fromOffset(12, 56),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			ScrollBarThickness = 6,
-			CanvasSize = UDim2.new(),
-			AutomaticCanvasSize = Enum.AutomaticSize.Y,
-			Parent = g,
-		},
-		{
-			new("UIGridLayout", { CellSize = UDim2.fromOffset(164, 150), CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
-		}
-	)
-	E.cards = {}
-	for i, c in Characters do
-		local card = new("Frame", { BackgroundColor3 = Color3.fromRGB(44, 36, 70), BorderSizePixel = 0, LayoutOrder = i, Parent = grid }, { corner(10) })
-		local st = stroke(Color3.fromHex(c.kart), 2)
-		st.Parent = card
-		new("Frame", { Size = UDim2.new(1, 0, 0, 8), BackgroundColor3 = Color3.fromHex(c.kart), BorderSizePixel = 0, Parent = card }, { corner(4) })
-		label({
-			Size = UDim2.new(1, -10, 0, 24),
-			Position = UDim2.fromOffset(5, 12),
-			Text = c.emblem .. " " .. c.name,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Parent = card,
-		})
-		label({
-			Size = UDim2.new(1, -10, 0, 16),
-			Position = UDim2.fromOffset(5, 36),
-			Font = TXT2,
-			Text = c.title,
-			TextTransparency = 0.2,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Parent = card,
-		})
-		local y = 56
-		for _, s in { { "СКОР", c.stats.speed }, { "РАЗГ", c.stats.accel }, { "УПР", c.stats.handling } } do
-			label({
-				Size = UDim2.fromOffset(44, 14),
-				Position = UDim2.fromOffset(6, y),
-				Font = TXT2,
-				Text = s[1],
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Parent = card,
-			})
-			local bar = new(
-				"Frame",
-				{
-					Size = UDim2.new(1, -62, 0, 8),
-					Position = UDim2.fromOffset(52, y + 3),
-					BackgroundColor3 = Color3.fromRGB(70, 60, 100),
-					BorderSizePixel = 0,
-					Parent = card,
-				},
-				{ corner(4) }
-			)
-			new("Frame", { Size = UDim2.fromScale(s[2] / 5, 1), BackgroundColor3 = Color3.fromHex(c.kart), BorderSizePixel = 0, Parent = bar }, { corner(4) })
-			y += 17
-		end
-		local btn = button({ Size = UDim2.new(1, -12, 0, 32), Position = UDim2.new(0, 6, 1, -38), Text = "", Parent = card }, function()
-			local cb = E.callbacks
-			local prof = E.profile
-			if not prof or not cb then
-				return
-			end
-			if prof.owned[c.id] then
-				cb.select(c.id)
-			else
-				cb.buy(c.id)
-			end
-		end)
-		E.cards[c.id] = { card = card, btn = btn, stroke = st }
-	end
-	button(
-		{
-			Size = UDim2.fromOffset(160, 40),
-			Position = UDim2.new(0.5, -80, 1, -50),
-			Text = "ЗАКРЫТЬ",
-			BackgroundColor3 = Color3.fromRGB(90, 80, 130),
-			Parent = g,
-		},
-		function()
-			Hud.openGarage(false)
-		end
-	)
-end
-
-function Hud.openGarage(on: boolean)
-	E.garage.Visible = on
-end
-
-function Hud.setProfile(prof)
-	if not prof then
-		return
-	end
-	E.profile = prof
-	E.wallet.Text = "● " .. tostring(prof.coins)
-	E.garageWallet.Text = "● " .. tostring(prof.coins)
-	for id, card in E.cards do
-		local c = charById[id]
-		if prof.selected == id then
-			card.btn.Text = "ВЫБРАН"
-			card.btn.BackgroundColor3 = Color3.fromRGB(60, 200, 110)
-			card.stroke.Thickness = 4
-		elseif prof.owned[id] then
-			card.btn.Text = "ВЫБРАТЬ"
-			card.btn.BackgroundColor3 = PINK
-			card.stroke.Thickness = 2
-		else
-			card.btn.Text = "● " .. tostring(c.price)
-			card.btn.BackgroundColor3 = if prof.coins >= c.price then GOLD else Color3.fromRGB(90, 80, 110)
-			card.stroke.Thickness = 2
-		end
-	end
 end
 
 -- ---------------------------------------------------------------- состояние экрана
@@ -8367,21 +8389,25 @@ end
 --- mode: 'lobby' | 'intro' | 'countdown' | 'race' | 'results' | 'spectate'
 function Hud.setMode(mode: string, info: { [string]: any }?)
 	local i = info or {}
-	E.mode = mode
+	if E.mode ~= mode then
+		E.mode = mode
+		if mode ~= "lobby" and mode ~= "spectate" then
+			Hud.openGarage(false)
+		end
+		if mode == "lobby" then
+			Hud.refreshVotes()
+		end
+	end
 	local racing = mode == "countdown" or mode == "race"
 	E.race.Visible = racing
 	if E.touch then
 		E.touch.Visible = racing
 	end
 	E.rev.Visible = mode == "countdown" and i.onGrid == true
-	E.wallet.Visible = mode == "lobby" or mode == "results" or mode == "intro" or mode == "spectate"
-	E.garageBtn.Visible = mode == "lobby" or mode == "results" or mode == "spectate"
-	if not E.garageBtn.Visible then
-		Hud.openGarage(false)
-	end
+	E.lobby.Visible = mode == "lobby" and not E.garage.Visible
 	E.results.Visible = mode == "results"
-	E.banner.Visible = mode == "lobby" or mode == "intro" or mode == "spectate"
-	if mode ~= "countdown" and mode ~= "race" then
+	E.banner.Visible = mode == "intro" or mode == "spectate"
+	if not racing then
 		E.big.Text = ""
 	end
 end
@@ -8406,56 +8432,42 @@ function Hud.big(text: string, color: Color3?, dur: number?)
 end
 
 function Hud.callout(text: string, color: Color3?, dur: number?)
-	local l = label({
-		Size = UDim2.fromOffset(520, 36),
-		Text = text,
-		TextColor3 = WHITE,
-		TextStrokeColor3 = color or PINK,
-		TextStrokeTransparency = 0,
-		Parent = E.callouts,
-	})
+	local holder = new("Frame", { Size = UDim2.fromOffset(360, 34), BackgroundColor3 = color or PINK, BackgroundTransparency = 0.1, BorderSizePixel = 0, Parent = E.callouts }, { corner(17) })
+	local l = label({ Size = UDim2.new(1, -20, 1, -8), Position = UDim2.fromOffset(10, 4), Text = text, TextStrokeTransparency = 0.6, TextStrokeColor3 = NAVY, Parent = holder })
 	local kids = E.callouts:GetChildren()
 	if #kids > 4 then
 		for _, k in kids do
-			if k:IsA("TextLabel") then
+			if k:IsA("Frame") then
 				k:Destroy()
 				break
 			end
 		end
 	end
 	task.delay(dur or 1.6, function()
-		if l.Parent then
+		if holder.Parent then
+			TweenService:Create(holder, TweenInfo.new(0.3), { BackgroundTransparency = 1 }):Play()
 			TweenService:Create(l, TweenInfo.new(0.3), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
 			task.wait(0.32)
-			l:Destroy()
+			holder:Destroy()
 		end
 	end)
 end
 
-local function fmtTime(t: number?): string
-	if not t then
-		return "—"
-	end
-	local m = math.floor(t / 60)
-	local s = t - m * 60
-	return string.format("%d:%05.2f", m, s)
-end
-Hud.fmtTime = fmtTime
-
---- st: { place, total, lap, laps, speed (м/с), meter, coins, item, roulette, draft, time, wrongWay, order = {{name, me, color}} }
+--- st: { place, total, lap, laps, speed (м/с), meter, coins, item, roulette, draft, time, finished, order = {{name, me, color}} }
 function Hud.race(st)
 	E.place.Text = tostring(st.place)
 	E.placeOf.Text = "/" .. tostring(st.total)
 	E.lap.Text = if st.finished then "ФИНИШ!" else string.format("КРУГ %d/%d", math.clamp(st.lap, 1, st.laps), st.laps)
 	E.time.Text = fmtTime(st.time)
 	E.speed.Text = tostring(math.floor(math.abs(st.speed) * 3.6 + 0.5))
+	local full = math.floor(st.meter + 1e-6)
 	for i, s in E.meterSegs do
 		local f = math.clamp(st.meter - (i - 1), 0, 1)
 		s.fill.Size = UDim2.fromScale(f, 1)
-		s.fill.BackgroundTransparency = if f >= 1 then 0 else 0.35
+		s.fill.BackgroundTransparency = if f >= 1 then 0 else 0.45
 	end
+	E.meterKey.TextColor3 = if full >= 1 then WHITE else GREY
 	E.coins.Text = "● " .. tostring(st.coins) .. (if st.coins >= 10 then " MAX" else "")
-	-- предмет
 	if st.roulette and st.roulette > 0 then
 		local ids = Layout.ITEM_IDS
 		local k = ids[(math.floor(os.clock() * 14) % #ids) + 1]
@@ -8468,6 +8480,7 @@ function Hud.race(st)
 		E.itemIcon.Text = ""
 		E.itemName.Text = ""
 	end
+	E.itemHint.Visible = st.item ~= nil
 	E.draftBar.Visible = st.draft > 0.05
 	E.draftFill.Size = UDim2.fromScale(math.clamp(st.draft / Kart.PHYS.draftTime, 0, 1), 1)
 	for i, r in E.boardRows do
@@ -8475,133 +8488,17 @@ function Hud.race(st)
 		r.row.Visible = o ~= nil
 		if o then
 			r.name.Text = o.name
-			r.row.BackgroundColor3 = if o.me then PINK else DARK
-			r.row.BackgroundTransparency = if o.me then 0.1 else 0.45
-			r.num.TextColor3 = o.color or WHITE
+			r.row.BackgroundColor3 = if o.me then PINK else NAVY
+			r.row.BackgroundTransparency = if o.me then 0.05 else 0.3
+			r.chip.BackgroundColor3 = o.color or WHITE
 		end
 	end
 end
 
 function Hud.rev(rev: number, charge: number, visible: boolean)
 	E.rev.Visible = visible
-	E.revNeedle.Position = UDim2.new(math.clamp(rev, 0, 1), -3, 0, -3)
-	E.revCharge.Size = UDim2.new(math.clamp(charge, 0, 1), 0, 0, 5)
-end
-
---- data: { list = {{id,name,charId,place,time,finished,gain,total,isBot}}, final, standings, raceNum, raceCount }
-function Hud.showResults(data, myId: number, myKey: string?)
-	for _, c in E.resList:GetChildren() do
-		if c:IsA("Frame") then
-			c:Destroy()
-		end
-	end
-	if data.final then
-		E.resTitle.Text = "ИТОГ ГРАН-ПРИ"
-		for i, st in data.standings do
-			if i > 8 then
-				break
-			end
-			local me = st.key == myKey
-			local row = panel({
-				Size = UDim2.new(1, 0, 0, 31),
-				LayoutOrder = i,
-				BackgroundColor3 = if me then PINK else Color3.fromRGB(50, 40, 80),
-				BackgroundTransparency = 0.15,
-				Parent = E.resList,
-			})
-			label({
-				Size = UDim2.fromOffset(40, 27),
-				Position = UDim2.fromOffset(6, 2),
-				Font = NUM,
-				Text = tostring(i),
-				TextColor3 = if i <= 3 then GOLD else WHITE,
-				Parent = row,
-			})
-			label({
-				Size = UDim2.new(1, -170, 0, 25),
-				Position = UDim2.fromOffset(52, 3),
-				Font = TXT2,
-				Text = st.name,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Parent = row,
-			})
-			label({
-				Size = UDim2.fromOffset(100, 25),
-				Position = UDim2.new(1, -110, 0, 3),
-				Font = NUM,
-				Text = tostring(st.total) .. " оч.",
-				TextXAlignment = Enum.TextXAlignment.Right,
-				Parent = row,
-			})
-		end
-	else
-		E.resTitle.Text = string.format("ГОНКА %d/%d — ИТОГИ", data.raceNum, data.raceCount)
-		for _, r in data.list do
-			local me = r.id == myId
-			local row = panel({
-				Size = UDim2.new(1, 0, 0, 31),
-				LayoutOrder = r.place,
-				BackgroundColor3 = if me then PINK else Color3.fromRGB(50, 40, 80),
-				BackgroundTransparency = 0.15,
-				Parent = E.resList,
-			})
-			label({
-				Size = UDim2.fromOffset(40, 27),
-				Position = UDim2.fromOffset(6, 2),
-				Font = NUM,
-				Text = tostring(r.place),
-				TextColor3 = if r.place <= 3 then GOLD else WHITE,
-				Parent = row,
-			})
-			local c = charById[r.charId]
-			new(
-				"Frame",
-				{
-					Size = UDim2.fromOffset(8, 22),
-					Position = UDim2.fromOffset(46, 4),
-					BackgroundColor3 = if c then Color3.fromHex(c.kart) else WHITE,
-					BorderSizePixel = 0,
-					Parent = row,
-				},
-				{ corner(3) }
-			)
-			label({
-				Size = UDim2.new(1, -300, 0, 25),
-				Position = UDim2.fromOffset(62, 3),
-				Font = TXT2,
-				Text = r.name .. (if r.isBot then "" else " ★"),
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Parent = row,
-			})
-			label({
-				Size = UDim2.fromOffset(110, 25),
-				Position = UDim2.new(1, -230, 0, 3),
-				Font = NUM,
-				Text = if r.finished then fmtTime(r.time) else "—",
-				Parent = row,
-			})
-			label({
-				Size = UDim2.fromOffset(110, 25),
-				Position = UDim2.new(1, -116, 0, 3),
-				Font = NUM,
-				Text = string.format("+%d (%d)", r.gain, r.total),
-				TextXAlignment = Enum.TextXAlignment.Right,
-				Parent = row,
-			})
-		end
-	end
-	E.resReward.Text = ""
-	E.resNext.Text = if data.final
-		then "Новый Гран-при скоро начнётся"
-		else "Следующая трасса через несколько секунд…"
-end
-
-function Hud.showReward(rw)
-	local parts = { string.format("Собрано монет: %d", rw.collected), string.format("За место: +%d", rw.placeBonus) }
-	if rw.cupBonus and rw.cupBonus > 0 then
-		table.insert(parts, string.format("Кубок (%d место): +%d", rw.cupPlace, rw.cupBonus))
-	end
-	E.resReward.Text = table.concat(parts, "   ·   ") .. string.format("   =  ● %d", rw.total)
+	E.revNeedle.Position = UDim2.new(0, 10 + math.clamp(rev, 0, 1) * E.revInnerW, 0, 4)
+	E.revCharge.Size = UDim2.fromOffset(math.clamp(charge, 0, 1) * E.revInnerW, 5)
 end
 
 return Hud
@@ -8728,7 +8625,7 @@ return Input
         <Properties>
           <string name="Name">KartModel</string>
           <string name="Source"><![CDATA[--!strict
--- Модель карта с пилотом в аниме-стиле из простых деталей (цвета гонщика из Shared/Characters).
+-- Модель машины из простых деталей: восемь кузовов (Shared/Cars), краска на выбор.
 -- Корень якорный, остальные детали приварены — двигаем одну деталь за кадр.
 -- Эффекты: искры дрифта по уровню, пламя буста, щит, лёд, кручение после попадания, табличка с именем.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8761,10 +8658,23 @@ local function hex(h: string): Color3
 	return Color3.fromHex(h)
 end
 
-function KartModel.new(char, name: string?, isMe: boolean?)
+-- параметры кузовов (метры): ширина, длина, высота борта, кабина, стёкла, колёса, антикрыло
+local BODIES = {
+	coupe = { w = 1.8, len = 3.3, bh = 0.45, cab = { 1.5, 1.2, 0.42, 0.2 }, ws = 0.6, rw = 0.7, wr = 0.36, spoiler = "lip" },
+	sport = { w = 1.9, len = 3.5, bh = 0.36, cab = { 1.45, 1.0, 0.36, 0.25 }, ws = 0.8, rw = 0.9, wr = 0.36, spoiler = "wing" },
+	kei = { w = 1.6, len = 2.7, bh = 0.5, cab = { 1.5, 1.3, 0.55, 0.15 }, ws = 0.35, rw = 0.2, wr = 0.32, spoiler = "none" },
+	muscle = { w = 1.95, len = 3.6, bh = 0.5, cab = { 1.55, 1.1, 0.4, 0.45 }, ws = 0.55, rw = 0.8, wr = 0.4, spoiler = "lip", scoop = true },
+	drift = { w = 1.85, len = 3.4, bh = 0.42, cab = { 1.5, 1.15, 0.4, 0.2 }, ws = 0.65, rw = 0.75, wr = 0.36, spoiler = "big", skirts = true },
+	pickup = { w = 1.9, len = 3.6, bh = 0.6, cab = { 1.7, 1.1, 0.6, -0.35 }, ws = 0.4, rw = 0.1, wr = 0.44, spoiler = "none", bed = true },
+	buggy = { w = 1.8, len = 3.0, bh = 0.35, wr = 0.46, spoiler = "none", cage = true },
+	formula = { w = 0.9, len = 3.6, bh = 0.4, wr = 0.4, spoiler = "none", formula = true },
+}
+
+--- car — запись из Shared/Cars, paint — цвет кузова, name — подпись над машиной (не для своей).
+function KartModel.new(car, paint: Color3, name: string?, isMe: boolean?)
 	local self = setmetatable({}, KartModel)
 	local model = Instance.new("Model")
-	model.Name = "Kart_" .. (name or char.name)
+	model.Name = "Car_" .. (name or car.name)
 	self.model = model
 
 	local root = Instance.new("Part")
@@ -8779,9 +8689,10 @@ function KartModel.new(char, name: string?, isMe: boolean?)
 	model.PrimaryPart = root
 	self.root = root
 
-	local kartC = hex(char.kart)
-	local accC = hex(char.kartAccent)
-	local trimC = hex(char.trim)
+	local B = BODIES[car.body] or BODIES.coupe
+	local DARK = Color3.fromRGB(34, 34, 44)
+	local GLASS = Color3.fromRGB(40, 60, 90)
+	local accent = paint:Lerp(Color3.new(1, 1, 1), 0.75)
 
 	-- локальные координаты в метрах: X вправо, Y вверх, −Z вперёд (как LookVector)
 	local function add(shape: Enum.PartType?, size: Vector3, pos: Vector3, color: Color3, mat: Enum.Material?, rot: CFrame?, cls: string?): BasePart
@@ -8814,77 +8725,112 @@ function KartModel.new(char, name: string?, isMe: boolean?)
 		p.Parent = model
 		return p
 	end
+	local function body(size: Vector3, pos: Vector3, color: Color3?): BasePart
+		local p = add(nil, size, pos, color or paint, Enum.Material.SmoothPlastic)
+		p.Reflectance = 0.18
+		return p
+	end
+	local FLIP = CFrame.Angles(0, math.pi, 0)
 
-	-- шасси и корпус
-	add(nil, Vector3.new(1.7, 0.28, 2.5), Vector3.new(0, 0.42, 0), Color3.fromRGB(40, 40, 52))
-	add(nil, Vector3.new(1.5, 0.42, 1.6), Vector3.new(0, 0.72, 0.15), kartC)
-	add(nil, Vector3.new(1.3, 0.38, 0.9), Vector3.new(0, 0.68, -1.05), kartC, nil, nil, "Wedge")
-	add(nil, Vector3.new(1.55, 0.14, 0.35), Vector3.new(0, 0.5, -1.45), accC) -- бампер
-	add(nil, Vector3.new(1.62, 0.1, 1.7), Vector3.new(0, 0.95, 0.15), trimC) -- кант
-	add(nil, Vector3.new(1.8, 0.1, 0.4), Vector3.new(0, 1.35, 1.25), accC) -- спойлер
-	add(nil, Vector3.new(0.1, 0.4, 0.1), Vector3.new(-0.6, 1.15, 1.2), Color3.fromRGB(40, 40, 52))
-	add(nil, Vector3.new(0.1, 0.4, 0.1), Vector3.new(0.6, 1.15, 1.2), Color3.fromRGB(40, 40, 52))
-	-- колёса
+	local wr = B.wr
+	local ride = wr * 0.55 -- просвет
+	local half = B.len / 2
+	local top = ride + B.bh -- верх борта
+
+	-- колёса с дисками
+	local tx = if B.formula then 0.98 elseif B.cage then B.w / 2 + 0.05 else B.w / 2 - 0.1
 	local wheels = {}
-	for _, w in { { -0.85, -0.85 }, { 0.85, -0.85 }, { -0.88, 0.9 }, { 0.88, 0.9 } } do
-		local big = w[2] > 0
-		local r = if big then 0.42 else 0.36
-		table.insert(
-			wheels,
-			add(Enum.PartType.Cylinder, Vector3.new(if big then 0.42 else 0.34, r * 2, r * 2), Vector3.new(w[1], r, w[2]), Color3.fromRGB(30, 30, 36))
-		)
-		add(
-			Enum.PartType.Cylinder,
-			Vector3.new(0.05, r * 1.1, r * 1.1),
-			Vector3.new(w[1] + (if w[1] > 0 then 1 else -1) * (if big then 0.22 else 0.18), r, w[2]),
-			trimC,
-			Enum.Material.Metal
-		)
+	for _, w in { { -tx, -half + 0.65 }, { tx, -half + 0.65 }, { -tx, half - 0.65 }, { tx, half - 0.65 } } do
+		local wide = if B.formula or B.cage then 0.42 else 0.3
+		table.insert(wheels, add(Enum.PartType.Cylinder, Vector3.new(wide, wr * 2, wr * 2), Vector3.new(w[1], wr, w[2]), Color3.fromRGB(26, 26, 30), Enum.Material.Rubber))
+		add(Enum.PartType.Cylinder, Vector3.new(0.04, wr * 1.15, wr * 1.15), Vector3.new(w[1] + (if w[1] > 0 then 1 else -1) * (wide / 2 + 0.005), wr, w[2]), Color3.fromRGB(215, 218, 230), Enum.Material.Metal)
+	end
+
+	if B.formula then
+		-- болид: узкий монокок, носовой обтекатель, крылья, шлем пилота
+		body(Vector3.new(0.9, 0.4, 2.2), Vector3.new(0, ride + 0.2, 0.3))
+		local nose = add(nil, Vector3.new(0.6, 0.3, 1.3), Vector3.new(0, ride + 0.15, -1.3), paint, nil, nil, "Wedge")
+		nose.Reflectance = 0.18
+		add(nil, Vector3.new(1.9, 0.06, 0.45), Vector3.new(0, ride - 0.02, -half + 0.25), accent)
+		add(nil, Vector3.new(0.06, 0.3, 0.45), Vector3.new(-0.95, ride + 0.1, -half + 0.25), DARK)
+		add(nil, Vector3.new(0.06, 0.3, 0.45), Vector3.new(0.95, ride + 0.1, -half + 0.25), DARK)
+		body(Vector3.new(1.5, 0.3, 0.9), Vector3.new(0, ride + 0.15, 0.4), accent) -- понтоны
+		add(nil, Vector3.new(1.5, 0.08, 0.5), Vector3.new(0, ride + 0.95, half - 0.2), accent) -- заднее крыло
+		add(nil, Vector3.new(0.06, 0.6, 0.5), Vector3.new(-0.72, ride + 0.68, half - 0.2), DARK)
+		add(nil, Vector3.new(0.06, 0.6, 0.5), Vector3.new(0.72, ride + 0.68, half - 0.2), DARK)
+		add(Enum.PartType.Ball, Vector3.new(0.5, 0.5, 0.5), Vector3.new(0, ride + 0.62, 0.15), Color3.fromRGB(245, 245, 250)) -- шлем
+		add(nil, Vector3.new(0.36, 0.14, 0.05), Vector3.new(0, ride + 0.64, -0.08), DARK, Enum.Material.Glass)
+		add(nil, Vector3.new(0.5, 0.5, 0.6), Vector3.new(0, ride + 0.62, 0.75), paint) -- воздухозаборник
+	elseif B.cage then
+		-- багги: открытая рама, каркас безопасности, сиденье
+		body(Vector3.new(1.3, B.bh, B.len - 0.2), Vector3.new(0, ride + B.bh / 2, 0))
+		local hood = add(nil, Vector3.new(1.3, 0.3, 0.9), Vector3.new(0, top + 0.15, -half + 0.6), paint, nil, nil, "Wedge")
+		hood.Reflectance = 0.18
+		for _, x in { -0.62, 0.62 } do
+			add(nil, Vector3.new(0.08, 0.95, 0.08), Vector3.new(x, top + 0.47, -0.2), DARK, Enum.Material.Metal)
+			add(nil, Vector3.new(0.08, 0.95, 0.08), Vector3.new(x, top + 0.47, 0.9), DARK, Enum.Material.Metal)
+			add(nil, Vector3.new(0.08, 0.08, 1.2), Vector3.new(x, top + 0.95, 0.35), DARK, Enum.Material.Metal)
+		end
+		add(nil, Vector3.new(1.32, 0.08, 0.08), Vector3.new(0, top + 0.95, -0.2), DARK, Enum.Material.Metal)
+		add(nil, Vector3.new(1.32, 0.08, 0.08), Vector3.new(0, top + 0.95, 0.9), DARK, Enum.Material.Metal)
+		add(nil, Vector3.new(0.6, 0.7, 0.2), Vector3.new(0, top + 0.35, 0.6), accent) -- сиденье
+		add(nil, Vector3.new(1.0, 0.5, 0.6), Vector3.new(0, top + 0.25, half - 0.4), DARK, Enum.Material.Metal) -- мотор
+		add(Enum.PartType.Ball, Vector3.new(0.3, 0.3, 0.3), Vector3.new(-0.4, top + 1.05, -0.2), Color3.fromRGB(255, 240, 180), Enum.Material.Neon)
+		add(Enum.PartType.Ball, Vector3.new(0.3, 0.3, 0.3), Vector3.new(0.4, top + 1.05, -0.2), Color3.fromRGB(255, 240, 180), Enum.Material.Neon)
+	else
+		-- кузов, кабина со стёклами
+		body(Vector3.new(B.w, B.bh, B.len), Vector3.new(0, ride + B.bh / 2, 0))
+		add(nil, Vector3.new(B.w + 0.04, 0.1, B.len + 0.04), Vector3.new(0, ride + 0.05, 0), DARK) -- юбка
+		local cw, cl, ch, cz = B.cab[1], B.cab[2], B.cab[3], B.cab[4]
+		body(Vector3.new(cw, ch, cl), Vector3.new(0, top + ch / 2, cz))
+		add(nil, Vector3.new(cw + 0.02, ch * 0.62, cl - 0.16), Vector3.new(0, top + ch * 0.55, cz), GLASS, Enum.Material.Glass) -- боковые окна
+		add(nil, Vector3.new(cw - 0.08, ch, B.ws), Vector3.new(0, top + ch / 2, cz - cl / 2 - B.ws / 2), GLASS, Enum.Material.Glass, nil, "Wedge") -- лобовое
+		add(nil, Vector3.new(cw - 0.08, ch, B.rw), Vector3.new(0, top + ch / 2, cz + cl / 2 + B.rw / 2), GLASS, Enum.Material.Glass, FLIP, "Wedge") -- заднее
+		-- бамперы
+		add(nil, Vector3.new(B.w + 0.02, 0.16, 0.14), Vector3.new(0, ride + 0.12, -half - 0.03), DARK)
+		add(nil, Vector3.new(B.w + 0.02, 0.16, 0.14), Vector3.new(0, ride + 0.12, half + 0.03), DARK)
+		-- полоса по капоту и крыше
+		add(nil, Vector3.new(0.34, 0.02, B.len - 0.1), Vector3.new(0, top + 0.01, 0), accent)
+		if B.scoop then
+			add(nil, Vector3.new(0.6, 0.16, 0.7), Vector3.new(0, top + 0.08, -half + 0.9), DARK)
+		end
+		if B.skirts then
+			add(nil, Vector3.new(0.06, 0.14, B.len - 1.5), Vector3.new(-B.w / 2 - 0.02, ride + 0.1, 0), accent)
+			add(nil, Vector3.new(0.06, 0.14, B.len - 1.5), Vector3.new(B.w / 2 + 0.02, ride + 0.1, 0), accent)
+		end
+		if B.bed then
+			-- кузов пикапа: борта и тёмный пол
+			add(nil, Vector3.new(B.w - 0.2, 0.04, 1.4), Vector3.new(0, top + 0.02, half - 0.8), DARK)
+			add(nil, Vector3.new(0.1, 0.32, 1.5), Vector3.new(-B.w / 2 + 0.05, top + 0.16, half - 0.78), paint)
+			add(nil, Vector3.new(0.1, 0.32, 1.5), Vector3.new(B.w / 2 - 0.05, top + 0.16, half - 0.78), paint)
+			add(nil, Vector3.new(B.w, 0.32, 0.1), Vector3.new(0, top + 0.16, half - 0.05), paint)
+		end
+		if B.spoiler == "lip" then
+			add(nil, Vector3.new(B.w - 0.1, 0.08, 0.3), Vector3.new(0, top + 0.1, half - 0.15), paint)
+		elseif B.spoiler == "wing" or B.spoiler == "big" then
+			local h = if B.spoiler == "big" then 0.6 else 0.36
+			add(nil, Vector3.new(B.w + (if B.spoiler == "big" then 0.1 else -0.2), 0.07, 0.42), Vector3.new(0, top + h, half - 0.2), if B.spoiler == "big" then DARK else paint)
+			add(nil, Vector3.new(0.07, h, 0.3), Vector3.new(-B.w / 2 + 0.35, top + h / 2, half - 0.2), DARK)
+			add(nil, Vector3.new(0.07, h, 0.3), Vector3.new(B.w / 2 - 0.35, top + h / 2, half - 0.2), DARK)
+		end
+	end
+	-- фары и стоп-сигналы
+	if not B.cage then
+		local lx = if B.formula then 0.2 else B.w / 2 - 0.3
+		local ly = ride + B.bh * 0.62
+		for _, x in { -lx, lx } do
+			add(nil, Vector3.new(0.36, 0.14, 0.06), Vector3.new(x, ly, -half - (if B.formula then -1.0 else 0.0) - 0.01), Color3.fromRGB(255, 244, 200), Enum.Material.Neon)
+			add(nil, Vector3.new(0.4, 0.12, 0.06), Vector3.new(x, ly, half + 0.01), Color3.fromRGB(255, 40, 50), Enum.Material.Neon)
+		end
 	end
 	-- выхлоп
-	local exL = add(
-		Enum.PartType.Cylinder,
-		Vector3.new(0.35, 0.18, 0.18),
-		Vector3.new(-0.35, 0.62, 1.35),
-		Color3.fromRGB(150, 150, 160),
-		Enum.Material.Metal,
-		CFrame.Angles(0, math.pi / 2, 0)
-	)
-	add(
-		Enum.PartType.Cylinder,
-		Vector3.new(0.35, 0.18, 0.18),
-		Vector3.new(0.35, 0.62, 1.35),
-		Color3.fromRGB(150, 150, 160),
-		Enum.Material.Metal,
-		CFrame.Angles(0, math.pi / 2, 0)
-	)
-
-	-- пилот
-	local skin = hex(char.skin)
-	local hair = hex(char.hair)
-	add(nil, Vector3.new(0.75, 0.6, 0.5), Vector3.new(0, 1.2, 0.35), hex(char.outfit)) -- торс
-	add(nil, Vector3.new(0.77, 0.12, 0.52), Vector3.new(0, 1.05, 0.35), hex(char.outfitAccent))
-	add(Enum.PartType.Ball, Vector3.new(0.78, 0.78, 0.78), Vector3.new(0, 1.82, 0.3), skin) -- голова
-	add(Enum.PartType.Ball, Vector3.new(0.9, 0.86, 0.9), Vector3.new(0, 1.92, 0.42), hair, Enum.Material.SmoothPlastic) -- волосы
-	add(nil, Vector3.new(0.86, 0.22, 0.3), Vector3.new(0, 2.12, 0.02), hair) -- чёлка
-	add(Enum.PartType.Ball, Vector3.new(0.34, 0.5, 0.34), Vector3.new(-0.42, 1.7, 0.55), hair) -- хвостики
-	add(Enum.PartType.Ball, Vector3.new(0.34, 0.5, 0.34), Vector3.new(0.42, 1.7, 0.55), hair)
-	add(nil, Vector3.new(0.12, 0.2, 0.04), Vector3.new(-0.15, 1.84, -0.09), Color3.fromRGB(40, 30, 60)) -- глаза
-	add(nil, Vector3.new(0.12, 0.2, 0.04), Vector3.new(0.15, 1.84, -0.09), Color3.fromRGB(40, 30, 60))
-	add(nil, Vector3.new(0.05, 0.06, 0.045), Vector3.new(-0.13, 1.9, -0.1), Color3.new(1, 1, 1), Enum.Material.Neon)
-	add(nil, Vector3.new(0.05, 0.06, 0.045), Vector3.new(0.17, 1.9, -0.1), Color3.new(1, 1, 1), Enum.Material.Neon)
-	-- руль
-	add(
-		Enum.PartType.Cylinder,
-		Vector3.new(0.06, 0.5, 0.5),
-		Vector3.new(0, 1.18, -0.25),
-		Color3.fromRGB(40, 40, 52),
-		nil,
-		CFrame.Angles(0, math.pi / 2, 0) * CFrame.Angles(0, 0, -0.5)
-	)
+	local exL = add(Enum.PartType.Cylinder, Vector3.new(0.3, 0.14, 0.14), Vector3.new(-0.4, ride + 0.1, half + 0.08), Color3.fromRGB(150, 150, 160), Enum.Material.Metal, CFrame.Angles(0, math.pi / 2, 0))
+	add(Enum.PartType.Cylinder, Vector3.new(0.3, 0.14, 0.14), Vector3.new(0.4, ride + 0.1, half + 0.08), Color3.fromRGB(150, 150, 160), Enum.Material.Metal, CFrame.Angles(0, math.pi / 2, 0))
+	local kartC = paint
+	local flameZ = half + 0.7
 
 	-- эффекты
-	local flame = add(Enum.PartType.Ball, Vector3.new(0.4, 0.4, 1.2), Vector3.new(0, 0.62, 1.9), Color3.fromRGB(255, 160, 60), Enum.Material.Neon)
+	local flame = add(Enum.PartType.Ball, Vector3.new(0.4, 0.4, 1.2), Vector3.new(0, ride + 0.2, flameZ), Color3.fromRGB(255, 160, 60), Enum.Material.Neon)
 	flame.CastShadow = false
 	flame.Transparency = 1
 	self.flame = flame
@@ -8932,7 +8878,7 @@ function KartModel.new(char, name: string?, isMe: boolean?)
 	if not isMe then
 		local bb = Instance.new("BillboardGui")
 		bb.Size = UDim2.fromOffset(160, 34)
-		bb.StudsOffsetWorldSpace = Vector3.new(0, 3.2 * SC, 0)
+		bb.StudsOffsetWorldSpace = Vector3.new(0, 2.5 * SC, 0)
 		bb.AlwaysOnTop = false
 		bb.MaxDistance = 250
 		bb.LightInfluence = 0
@@ -9043,7 +8989,7 @@ local Tracks = require(Shared:WaitForChild("Tracks"))
 local Kart = require(Shared:WaitForChild("Kart"))
 local Bot = require(Shared:WaitForChild("Bot"))
 local Net = require(Shared:WaitForChild("Net"))
-local Characters = require(Shared:WaitForChild("Characters"))
+local Cars = require(Shared:WaitForChild("Cars"))
 
 stage("модули клиента")
 local Input = require(script.Parent:WaitForChild("Input"))
@@ -9068,11 +9014,6 @@ pcall(function()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
 end)
 
-local CHAR_BY_ID = {}
-for _, c in Characters do
-	CHAR_BY_ID[c.id] = c
-end
-
 local function now(): number
 	return workspace:GetServerTimeNow()
 end
@@ -9081,7 +9022,6 @@ end
 
 local R: any = nil -- текущая гонка (после "setup")
 local profile: any = nil
-local myKey = "p" .. player.UserId
 
 local function clearRace()
 	if not R then
@@ -9126,8 +9066,7 @@ local function setupRace(d)
 		track = track,
 		trackId = d.trackId,
 		laps = d.laps,
-		raceNum = d.raceNum,
-		raceCount = d.raceCount,
+		pvp = d.pvp,
 		myId = d.myId,
 		roster = {},
 		remote = {},
@@ -9150,16 +9089,17 @@ local function setupRace(d)
 	}
 	for _, e in d.roster do
 		r.roster[e.id] = e
-		local c = CHAR_BY_ID[e.charId] or Characters[1]
+		local c = Cars.get(e.carId)
+		local paint = Color3.fromHex(Cars.paint(e.paint).color)
 		if e.id ~= d.myId then
-			local m = KartModel.new(c, e.name, false)
+			local m = KartModel.new(c, paint, e.name, false)
 			m:setParent(built.folder)
 			r.remote[e.id] = { model = m, net = nil, disp = nil, heading = 0, recv = 0, hint = -1, up = Vector3.yAxis, roster = e }
 		end
 	end
 	if d.myId > 0 then
 		local me = r.roster[d.myId]
-		local c = CHAR_BY_ID[me.charId] or Characters[1]
+		local c = Cars.get(me.carId)
 		local k = Kart.new(track, { stats = c.stats, isPlayer = true })
 		local L = track.length
 		local slot = d.myId - 1
@@ -9170,7 +9110,7 @@ local function setupRace(d)
 		k.totalProgress = -L + k.progress
 		k.onGrid = true
 		r.kart = k
-		r.myModel = KartModel.new(c, me.name, true)
+		r.myModel = KartModel.new(c, Color3.fromHex(Cars.paint(me.paint).color), me.name, true)
 		r.myModel:setParent(built.folder)
 		if d.phase == "race" then
 			-- подключились посреди гонки (переподключение) — сразу в путь
@@ -9254,6 +9194,9 @@ local function onRace(kind: string, d: any)
 		setupRace(d)
 	elseif kind == "lobby" then
 		clearRace()
+		Hud.resetVote()
+	elseif kind == "votes" then
+		Hud.setVotes(d)
 	elseif not R then
 		return
 	elseif kind == "go" then
@@ -9312,7 +9255,7 @@ local function onRace(kind: string, d: any)
 			Hud.callout(string.format("%s финишировал%s %d-м", who.name, "", d.place), Color3.fromRGB(90, 80, 130), 1.4)
 		end
 	elseif kind == "results" then
-		Hud.showResults(d, R.myId, myKey)
+		Hud.showResults(d, R.myId)
 		Audio.playMusic("results")
 		Audio.setMusicSpeed(1)
 		Audio.stopEngine()
@@ -9642,30 +9585,30 @@ end
 -- ---------------------------------------------------------------- кнопки гаража
 
 stage("интерфейс")
+local function shop(action: string, arg: any, okSound: string)
+	local ok, res = pcall(function()
+		return RF_Shop:InvokeServer(action, arg)
+	end)
+	if ok and res then
+		Audio.sfx(okSound, 0.8)
+		profile = res
+		Hud.setProfile(res)
+	end
+end
+
 Hud.init({
 	buy = function(id: string)
-		local ok, res = pcall(function()
-			return RF_Shop:InvokeServer("buy", id)
-		end)
-		if ok and res then
-			if res.owned[id] then
-				Audio.sfx("uiStart", 0.8)
-			else
-				Audio.sfx("uiBack", 0.8)
-			end
-			profile = res
-			Hud.setProfile(res)
-		end
+		shop("buy", id, "uiStart")
 	end,
 	select = function(id: string)
-		local ok, res = pcall(function()
-			return RF_Shop:InvokeServer("select", id)
-		end)
-		if ok and res then
-			Audio.sfx("uiSelect", 0.8)
-			profile = res
-			Hud.setProfile(res)
-		end
+		shop("select", id, "uiSelect")
+	end,
+	paint = function(i: number)
+		shop("paint", i, "uiMove")
+	end,
+	vote = function(id: string)
+		RE_Action:FireServer("vote", id)
+		Audio.sfx("uiSelect", 0.7)
 	end,
 })
 
@@ -9684,6 +9627,7 @@ RunService.RenderStepped:Connect(function(dt: number)
 	local phaseStart = ReplicatedStorage:GetAttribute("SD_PhaseStart") or now()
 	local t = now() - phaseStart
 	World.update(dt)
+	Hud.tick(dt)
 
 	if phase == "lobby" or not R then
 		if R then
@@ -9691,21 +9635,12 @@ RunService.RenderStepped:Connect(function(dt: number)
 		end
 		Audio.playMusic("menu")
 		Hud.setMode("lobby")
-		if phase == "lobby" then
-			local left = math.max(0, math.ceil(Config.LOBBY_TIME - t))
-			Hud.banner(
-				"SAKURA DRIFT GP",
-				string.format("Гран-при начнётся через %d с · выберите гонщика в гараже", left)
-			)
-		else
-			Hud.banner("SAKURA DRIFT GP", "Подключаемся к гонке…")
-		end
+		local left = math.max(0, math.ceil(Config.LOBBY_TIME - t))
+		Hud.lobby(left, ReplicatedStorage:GetAttribute("SD_Players") or 1, ReplicatedStorage:GetAttribute("SD_Need") or 1)
 		local w = World.current()
 		if w then
-			local tr = w.track
-			local c = (tr.boundsMin + tr.boundsMax) / 2
-			local ext = (tr.boundsMax - tr.boundsMin).Magnitude
-			orbitCam(dt, c, ext * 0.45, ext * 0.22, 0.05)
+			-- камера кружит у стартовой арки
+			orbitCam(dt, w.track:pointAt(6, 0, 2), 30, 9, 0.12)
 		end
 		return
 	end
@@ -9733,14 +9668,13 @@ RunService.RenderStepped:Connect(function(dt: number)
 			myPlace = i
 		end
 		local e = R.roster[o.id]
-		local c = e and CHAR_BY_ID[e.charId]
-		table.insert(rows, { name = if e then e.name else "?", me = o.me, color = c and Color3.fromHex(c.kart) })
+		table.insert(rows, { name = if e then e.name else "?", me = o.me, color = if e then Color3.fromHex(Cars.paint(e.paint).color) else nil })
 	end
 
 	if phase == "intro" then
 		Hud.setMode("intro")
 		local d = R.track.data
-		Hud.banner(d.name .. "  " .. d.jp, string.format("Гонка %d из %d · %s · %d круга", R.raceNum, R.raceCount, d.time, R.laps))
+		Hud.banner(d.name .. "  " .. d.jp, string.format("%s · %s · кругов: %d", if R.pvp then "Онлайн-заезд" else "Заезд с ботами", d.time, R.laps))
 		local u = math.clamp(t / Config.INTRO_TIME, 0, 1)
 		local L = R.track.length
 		local e = 1 - (1 - u) ^ 2
@@ -9793,7 +9727,7 @@ RunService.RenderStepped:Connect(function(dt: number)
 		else
 			-- зритель: камера за лидером
 			Hud.setMode("spectate")
-			Hud.banner("ВЫ ЗРИТЕЛЬ", "Присоединитесь со следующей гонки")
+			Hud.banner("ИДЁТ ЗАЕЗД", "Вы присоединитесь к следующему — он начнётся после финиша")
 			local lead = order[1]
 			local rk = lead and R.remote[lead.id]
 			if rk and rk.disp and rk.net then
@@ -10010,7 +9944,7 @@ local function tree(parent: Instance, pos: Vector3, scale: number, trunk: Color3
 				Size = Vector3.one * r * 2 * SC,
 				CFrame = CFrame.new(m2s(pos + off)),
 				Color = leaves[rnd:NextInteger(1, #leaves)],
-				Material = Enum.Material.SmoothPlastic,
+				Material = Enum.Material.Grass,
 				CastShadow = true,
 			},
 			parent
@@ -10088,16 +10022,105 @@ local function rock(parent: Instance, pos: Vector3, rnd: Random, color: Color3)
 	)
 end
 
+--- Облака, кольцо холмов (или небоскрёбов) на горизонте, трибуна у старта и арки над трассой.
+local function scenery(track, trackId: string, parent: Instance, groundY: number, theme)
+	local rnd = Random.new(4242 + #trackId)
+	local T = workspace.Terrain
+	local old = T:FindFirstChildOfClass("Clouds")
+	if old then
+		old:Destroy()
+	end
+	local clouds = Instance.new("Clouds")
+	clouds.Cover = if trackId == "neon" then 0.35 else 0.55
+	clouds.Density = 0.6
+	clouds.Color = if trackId == "sunset" then Color3.fromRGB(255, 200, 170) elseif trackId == "neon" then Color3.fromRGB(120, 90, 190) else Color3.new(1, 1, 1)
+	clouds.Parent = T
+
+	-- горизонт
+	local mn, mx = track.boundsMin, track.boundsMax
+	local c = (mn + mx) / 2
+	local rad = (mx - mn).Magnitude * 0.5 + 170
+	local n = 26
+	for i = 1, n do
+		local a = i / n * math.pi * 2 + rnd:NextNumber() * 0.1
+		local r = rad + rnd:NextNumber() * 90
+		local p = Vector3.new(c.X + math.cos(a) * r, groundY, c.Z + math.sin(a) * r)
+		if trackId == "neon" then
+			local h = 60 + rnd:NextNumber() * 110
+			local w = 26 + rnd:NextNumber() * 26
+			local cf = CFrame.new((p + Vector3.new(0, h / 2, 0)) * SC) * CFrame.Angles(0, a, 0)
+			part({ Size = Vector3.new(w, h, w) * SC, CFrame = cf, Color = Color3.fromRGB(24, 22, 52), Material = Enum.Material.Concrete }, parent)
+			part({ Size = Vector3.new(w + 0.4, 1.2, w + 0.4) * SC, CFrame = cf * CFrame.new(0, (h * (0.2 + rnd:NextNumber() * 0.6) - h / 2) * SC, 0), Color = NEON_COLS[rnd:NextInteger(1, #NEON_COLS)], Material = Enum.Material.Neon }, parent)
+		else
+			local h = 50 + rnd:NextNumber() * 80
+			local w = 150 + rnd:NextNumber() * 110
+			local col = if trackId == "sunset" then Color3.fromRGB(196, 120, 110) elseif trackId == "momiji" then Color3.fromRGB(150, 96, 70) else Color3.fromRGB(120, 170, 140)
+			part({ Shape = Enum.PartType.Ball, Size = Vector3.new(w, w, w) * SC, CFrame = CFrame.new((p + Vector3.new(0, h - w / 2, 0)) * SC), Color = col:Lerp(Color3.new(1, 1, 1), rnd:NextNumber() * 0.15), Material = Enum.Material.Grass }, parent)
+		end
+	end
+
+	-- трибуна слева от стартовой прямой: ступени и зрители
+	local gateC = hex(theme.gateA)
+	local fr = track:frameAtProgress(track.length - 26)
+	local back = fr.right:Cross(fr.up)
+	local base = fr.hw + fr.wall + 2.5
+	local crowd = { Color3.fromRGB(255, 120, 160), Color3.fromRGB(90, 190, 255), Color3.fromRGB(255, 220, 80), Color3.fromRGB(140, 230, 140), Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 140, 255) }
+	for step = 0, 4 do
+		local off = base + step * 1.6 + 0.8
+		local y = 0.5 + step * 0.9
+		local cpos = fr.pos - fr.right * off + fr.up * (y / 2)
+		part({ Size = Vector3.new(1.6, y, 34) * SC, CFrame = CFrame.fromMatrix(cpos * SC, fr.right, fr.up, back), Color = if step % 2 == 0 then Color3.fromRGB(210, 212, 225) else Color3.fromRGB(180, 184, 200), Material = Enum.Material.Concrete, CastShadow = true }, parent)
+		for k = -10, 10 do
+			if rnd:NextNumber() < 0.8 then
+				local q = fr.pos - fr.right * off + fr.up * (y + 0.45) + fr.tan * (k * 1.55 + rnd:NextNumber() * 0.4)
+				part({ Shape = Enum.PartType.Ball, Size = Vector3.one * 0.8 * SC, CFrame = CFrame.new(q * SC), Color = crowd[rnd:NextInteger(1, #crowd)] }, parent)
+			end
+		end
+	end
+	local roofC = fr.pos - fr.right * (base + 4.2) + fr.up * 7.2
+	part({ Size = Vector3.new(9.5, 0.3, 35) * SC, CFrame = CFrame.fromMatrix(roofC * SC, fr.right, fr.up, back) * CFrame.Angles(0, 0, 0.12), Color = gateC, Material = Enum.Material.Metal, CastShadow = true }, parent)
+	for _, k in { -16, 0, 16 } do
+		local q = fr.pos - fr.right * (base + 8.4) + fr.up * 3.6 + fr.tan * k
+		part({ Size = Vector3.new(0.4, 7.2, 0.4) * SC, CFrame = CFrame.fromMatrix(q * SC, fr.right, fr.up, back), Color = Color3.fromRGB(90, 92, 110), Material = Enum.Material.Metal }, parent)
+	end
+
+	-- арки над трассой через каждые ~220 м
+	local boostC = hex(theme.boost)
+	local s = 220
+	while s < track.length - 120 do
+		local f = track:frameAtProgress(s)
+		local fb = f.right:Cross(f.up)
+		local span = f.hw + f.wall + 0.9
+		local H = 8
+		for _, side in { -1, 1 } do
+			local q = f.pos + f.right * (side * span) + f.up * (H / 2)
+			part({ Size = Vector3.new(0.8, H, 0.8) * SC, CFrame = CFrame.fromMatrix(q * SC, f.right, f.up, fb), Color = Color3.fromRGB(60, 58, 84), Material = Enum.Material.Metal, CastShadow = true }, parent)
+		end
+		local top = f.pos + f.up * H
+		part({ Size = Vector3.new((span * 2 + 0.8), 1.1, 0.6) * SC, CFrame = CFrame.fromMatrix(top * SC, f.right, f.up, fb), Color = gateC, Material = Enum.Material.Metal, CastShadow = true }, parent)
+		part({ Size = Vector3.new((span * 2 - 1), 0.25, 0.7) * SC, CFrame = CFrame.fromMatrix((top - f.up * 0.75) * SC, f.right, f.up, fb), Color = boostC, Material = Enum.Material.Neon }, parent)
+		s += 220
+	end
+end
+
 local function decorate(track, trackId: string, parent: Instance, groundY: number)
 	local env = ENV[trackId] or ENV.sakura
 	local rnd = Random.new(#trackId * 977 + math.floor(track.length))
 	local mn, mx = track.boundsMin, track.boundsMax
 	local placed = 0
 	local tries = 0
-	while placed < 170 and tries < 3000 do
+	while placed < 320 and tries < 5000 do
 		tries += 1
 		local x = mn.X - 90 + rnd:NextNumber() * (mx.X - mn.X + 180)
 		local z = mn.Z - 90 + rnd:NextNumber() * (mx.Z - mn.Z + 180)
+		if rnd:NextNumber() < 0.65 then
+			-- большинство объектов — вдоль дороги, там их видно из машины
+			local i0 = rnd:NextInteger(1, track.count)
+			local side = if rnd:NextNumber() < 0.5 then -1 else 1
+			local off = track.hw[i0] + track.wall[i0] + 5 + rnd:NextNumber() * 9
+			local q = track.pos[i0] + track.right[i0] * (side * off)
+			x, z = q.X, q.Z
+		end
 		local dist, idx = track:distanceTo(x, z, 120)
 		if idx >= 0 then
 			local i = idx + 1
@@ -10261,7 +10284,7 @@ function World.build(trackId: string): Built
 	local centerC = hex(theme.center)
 	local curbA, curbB = hex(theme.curbA), hex(theme.curbB)
 	local wallA, wallB = hex(theme.wallA), hex(theme.wallB)
-	local wallMat = if theme.wallStyle == "neon" then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	local wallMat = if theme.wallStyle == "neon" then Enum.Material.Neon elseif theme.wallStyle == "guard" then Enum.Material.Metal else Enum.Material.Concrete
 	local shoulderC = env.shoulder
 	local CURB = 1.5
 	local seg = 0
@@ -10278,8 +10301,8 @@ function World.build(trackId: string): Built
 			strip(track, i, j, -0.18, 0.18, 0.04, 0.2, centerC, roadF)
 		end
 		local cc = if seg % 2 == 0 then curbA else curbB
-		strip(track, i, j, -hw - CURB, -hw, 0.06, 0.5, cc, roadF)
-		strip(track, i, j, hw, hw + CURB, 0.06, 0.5, cc, roadF)
+		strip(track, i, j, -hw - CURB, -hw, 0.06, 0.5, cc, roadF, Enum.Material.Concrete)
+		strip(track, i, j, hw, hw + CURB, 0.06, 0.5, cc, roadF, Enum.Material.Concrete)
 		if wall > CURB + 0.05 then
 			strip(track, i, j, -hw - wall, -hw - CURB, 0.0, 0.5, shoulderC, roadF, Enum.Material.Grass)
 			strip(track, i, j, hw + CURB, hw + wall, 0.0, 0.5, shoulderC, roadF, Enum.Material.Grass)
@@ -10455,6 +10478,7 @@ function World.build(trackId: string): Built
 
 	-- декор
 	decorate(track, trackId, decoF, groundY)
+	scenery(track, trackId, decoF, groundY, theme)
 
 	-- кристаллы
 	local itemF = Instance.new("Folder")
@@ -10672,6 +10696,19 @@ return World
 ]]></string>
         </Properties>
       </Item>
+    </Item>
+  </Item>
+  <Item class="Workspace" referent="31">
+    <Properties>
+      <string name="Name">Workspace</string>
+      <bool name="NeedsPivotMigration">false</bool>
+      <bool name="StreamingEnabled">false</bool>
+    </Properties>
+    <Item class="Terrain" referent="32">
+      <Properties>
+        <string name="Name">Terrain</string>
+        <bool name="Decoration">true</bool>
+      </Properties>
     </Item>
   </Item>
 </roblox>

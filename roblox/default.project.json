@@ -24,12 +24,26 @@
       "$properties": {
         "ClockTime": 13.2,
         "Brightness": 2.6,
-        "GlobalShadows": true
+        "GlobalShadows": true,
+        "Technology": "Future",
+        "EnvironmentDiffuseScale": 0.6,
+        "EnvironmentSpecularScale": 0.6
       }
     },
     "SoundService": {
       "$properties": {
         "RespectFilteringEnabled": true
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": false
+      },
+      "Terrain": {
+        "$className": "Terrain",
+        "$properties": {
+          "Decoration": true
+        }
       }
     }
   }

@@ -4,7 +4,6 @@ require("rbx_mock")
 local Config = require("Config")
 Config.LOBBY_TIME = 2
 Config.RESULTS_TIME = 3
-Config.TRACK_ORDER = { "sakura", "momiji" }
 
 -- перехват карта игрока: ввод клиента будет решать бот (сложный) — так игрок реально проходит круги
 local Kart = require("Kart")
@@ -57,6 +56,10 @@ Net.get("Race").OnClientEvent:Connect(function(kind, d)
 end)
 Net.get("Snapshot").OnClientEvent:Connect(function() log.snaps += 1 end)
 require("Main.client")
+Net.get("Action"):FireServer("vote", "momiji")
+assert(Net.get("Shop"):InvokeServer("paint", 4).paint == 4, "краска")
+assert(Net.get("Shop"):InvokeServer("select", "brute").car == "brute", "выбор машины")
+assert(Net.get("Shop"):InvokeServer("buy", "apex").car == "brute", "нет монет — не купить")
 __keys[Enum.KeyCode.W] = true
 local r0 = origRead()
 assert(r0.throttle == 1 and r0.steer == 0, "клавиатура: газ")
@@ -86,12 +89,11 @@ for _, f in log.finishes do if f.id then mine += 1 end end
 print("finishes", #log.finishes)
 if log.lastResults then
 	for _, r in log.lastResults.list do
-		print(string.format("  %d. %-8s %s %s +%d (%d)", r.place, r.name, r.isBot and "bot" or "YOU", r.finished and string.format("%.1f", r.time) or "DNF", r.gain, r.total))
+		print(string.format("  %d. %-14s %s %s %s", r.place, r.name, r.carId, r.isBot and "bot" or "YOU", r.finished and string.format("%.1f", r.time) or "DNF"))
 	end
-	print("final:", tostring(log.lastResults.final), "standings top:", log.lastResults.standings[1].name, log.lastResults.standings[1].total)
 end
-if log.reward then print("reward:", log.reward.collected, log.reward.placeBonus, log.reward.cupBonus, "total", log.reward.total, "wallet", profileCoins) end
+if log.reward then print("reward:", log.reward.collected, log.reward.placeBonus, log.reward.trophies, "total", log.reward.total, "wallet", profileCoins) end
 assert(log.results == 2, "должно быть 2 итоговых таблицы")
 assert(log.rewards == 2, "награды за обе гонки")
-assert(#log.finishes >= 8, "все финишировали хотя бы в одной гонке")
+assert(#log.finishes >= 6, "все финишировали хотя бы в одной гонке")
 print("GAME OK")

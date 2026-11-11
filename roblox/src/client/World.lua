@@ -188,7 +188,7 @@ local function tree(parent: Instance, pos: Vector3, scale: number, trunk: Color3
 				Size = Vector3.one * r * 2 * SC,
 				CFrame = CFrame.new(m2s(pos + off)),
 				Color = leaves[rnd:NextInteger(1, #leaves)],
-				Material = Enum.Material.SmoothPlastic,
+				Material = Enum.Material.Grass,
 				CastShadow = true,
 			},
 			parent
@@ -266,16 +266,105 @@ local function rock(parent: Instance, pos: Vector3, rnd: Random, color: Color3)
 	)
 end
 
+--- Облака, кольцо холмов (или небоскрёбов) на горизонте, трибуна у старта и арки над трассой.
+local function scenery(track, trackId: string, parent: Instance, groundY: number, theme)
+	local rnd = Random.new(4242 + #trackId)
+	local T = workspace.Terrain
+	local old = T:FindFirstChildOfClass("Clouds")
+	if old then
+		old:Destroy()
+	end
+	local clouds = Instance.new("Clouds")
+	clouds.Cover = if trackId == "neon" then 0.35 else 0.55
+	clouds.Density = 0.6
+	clouds.Color = if trackId == "sunset" then Color3.fromRGB(255, 200, 170) elseif trackId == "neon" then Color3.fromRGB(120, 90, 190) else Color3.new(1, 1, 1)
+	clouds.Parent = T
+
+	-- горизонт
+	local mn, mx = track.boundsMin, track.boundsMax
+	local c = (mn + mx) / 2
+	local rad = (mx - mn).Magnitude * 0.5 + 170
+	local n = 26
+	for i = 1, n do
+		local a = i / n * math.pi * 2 + rnd:NextNumber() * 0.1
+		local r = rad + rnd:NextNumber() * 90
+		local p = Vector3.new(c.X + math.cos(a) * r, groundY, c.Z + math.sin(a) * r)
+		if trackId == "neon" then
+			local h = 60 + rnd:NextNumber() * 110
+			local w = 26 + rnd:NextNumber() * 26
+			local cf = CFrame.new((p + Vector3.new(0, h / 2, 0)) * SC) * CFrame.Angles(0, a, 0)
+			part({ Size = Vector3.new(w, h, w) * SC, CFrame = cf, Color = Color3.fromRGB(24, 22, 52), Material = Enum.Material.Concrete }, parent)
+			part({ Size = Vector3.new(w + 0.4, 1.2, w + 0.4) * SC, CFrame = cf * CFrame.new(0, (h * (0.2 + rnd:NextNumber() * 0.6) - h / 2) * SC, 0), Color = NEON_COLS[rnd:NextInteger(1, #NEON_COLS)], Material = Enum.Material.Neon }, parent)
+		else
+			local h = 50 + rnd:NextNumber() * 80
+			local w = 150 + rnd:NextNumber() * 110
+			local col = if trackId == "sunset" then Color3.fromRGB(196, 120, 110) elseif trackId == "momiji" then Color3.fromRGB(150, 96, 70) else Color3.fromRGB(120, 170, 140)
+			part({ Shape = Enum.PartType.Ball, Size = Vector3.new(w, w, w) * SC, CFrame = CFrame.new((p + Vector3.new(0, h - w / 2, 0)) * SC), Color = col:Lerp(Color3.new(1, 1, 1), rnd:NextNumber() * 0.15), Material = Enum.Material.Grass }, parent)
+		end
+	end
+
+	-- трибуна слева от стартовой прямой: ступени и зрители
+	local gateC = hex(theme.gateA)
+	local fr = track:frameAtProgress(track.length - 26)
+	local back = fr.right:Cross(fr.up)
+	local base = fr.hw + fr.wall + 2.5
+	local crowd = { Color3.fromRGB(255, 120, 160), Color3.fromRGB(90, 190, 255), Color3.fromRGB(255, 220, 80), Color3.fromRGB(140, 230, 140), Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 140, 255) }
+	for step = 0, 4 do
+		local off = base + step * 1.6 + 0.8
+		local y = 0.5 + step * 0.9
+		local cpos = fr.pos - fr.right * off + fr.up * (y / 2)
+		part({ Size = Vector3.new(1.6, y, 34) * SC, CFrame = CFrame.fromMatrix(cpos * SC, fr.right, fr.up, back), Color = if step % 2 == 0 then Color3.fromRGB(210, 212, 225) else Color3.fromRGB(180, 184, 200), Material = Enum.Material.Concrete, CastShadow = true }, parent)
+		for k = -10, 10 do
+			if rnd:NextNumber() < 0.8 then
+				local q = fr.pos - fr.right * off + fr.up * (y + 0.45) + fr.tan * (k * 1.55 + rnd:NextNumber() * 0.4)
+				part({ Shape = Enum.PartType.Ball, Size = Vector3.one * 0.8 * SC, CFrame = CFrame.new(q * SC), Color = crowd[rnd:NextInteger(1, #crowd)] }, parent)
+			end
+		end
+	end
+	local roofC = fr.pos - fr.right * (base + 4.2) + fr.up * 7.2
+	part({ Size = Vector3.new(9.5, 0.3, 35) * SC, CFrame = CFrame.fromMatrix(roofC * SC, fr.right, fr.up, back) * CFrame.Angles(0, 0, 0.12), Color = gateC, Material = Enum.Material.Metal, CastShadow = true }, parent)
+	for _, k in { -16, 0, 16 } do
+		local q = fr.pos - fr.right * (base + 8.4) + fr.up * 3.6 + fr.tan * k
+		part({ Size = Vector3.new(0.4, 7.2, 0.4) * SC, CFrame = CFrame.fromMatrix(q * SC, fr.right, fr.up, back), Color = Color3.fromRGB(90, 92, 110), Material = Enum.Material.Metal }, parent)
+	end
+
+	-- арки над трассой через каждые ~220 м
+	local boostC = hex(theme.boost)
+	local s = 220
+	while s < track.length - 120 do
+		local f = track:frameAtProgress(s)
+		local fb = f.right:Cross(f.up)
+		local span = f.hw + f.wall + 0.9
+		local H = 8
+		for _, side in { -1, 1 } do
+			local q = f.pos + f.right * (side * span) + f.up * (H / 2)
+			part({ Size = Vector3.new(0.8, H, 0.8) * SC, CFrame = CFrame.fromMatrix(q * SC, f.right, f.up, fb), Color = Color3.fromRGB(60, 58, 84), Material = Enum.Material.Metal, CastShadow = true }, parent)
+		end
+		local top = f.pos + f.up * H
+		part({ Size = Vector3.new((span * 2 + 0.8), 1.1, 0.6) * SC, CFrame = CFrame.fromMatrix(top * SC, f.right, f.up, fb), Color = gateC, Material = Enum.Material.Metal, CastShadow = true }, parent)
+		part({ Size = Vector3.new((span * 2 - 1), 0.25, 0.7) * SC, CFrame = CFrame.fromMatrix((top - f.up * 0.75) * SC, f.right, f.up, fb), Color = boostC, Material = Enum.Material.Neon }, parent)
+		s += 220
+	end
+end
+
 local function decorate(track, trackId: string, parent: Instance, groundY: number)
 	local env = ENV[trackId] or ENV.sakura
 	local rnd = Random.new(#trackId * 977 + math.floor(track.length))
 	local mn, mx = track.boundsMin, track.boundsMax
 	local placed = 0
 	local tries = 0
-	while placed < 170 and tries < 3000 do
+	while placed < 320 and tries < 5000 do
 		tries += 1
 		local x = mn.X - 90 + rnd:NextNumber() * (mx.X - mn.X + 180)
 		local z = mn.Z - 90 + rnd:NextNumber() * (mx.Z - mn.Z + 180)
+		if rnd:NextNumber() < 0.65 then
+			-- большинство объектов — вдоль дороги, там их видно из машины
+			local i0 = rnd:NextInteger(1, track.count)
+			local side = if rnd:NextNumber() < 0.5 then -1 else 1
+			local off = track.hw[i0] + track.wall[i0] + 5 + rnd:NextNumber() * 9
+			local q = track.pos[i0] + track.right[i0] * (side * off)
+			x, z = q.X, q.Z
+		end
 		local dist, idx = track:distanceTo(x, z, 120)
 		if idx >= 0 then
 			local i = idx + 1
@@ -439,7 +528,7 @@ function World.build(trackId: string): Built
 	local centerC = hex(theme.center)
 	local curbA, curbB = hex(theme.curbA), hex(theme.curbB)
 	local wallA, wallB = hex(theme.wallA), hex(theme.wallB)
-	local wallMat = if theme.wallStyle == "neon" then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	local wallMat = if theme.wallStyle == "neon" then Enum.Material.Neon elseif theme.wallStyle == "guard" then Enum.Material.Metal else Enum.Material.Concrete
 	local shoulderC = env.shoulder
 	local CURB = 1.5
 	local seg = 0
@@ -456,8 +545,8 @@ function World.build(trackId: string): Built
 			strip(track, i, j, -0.18, 0.18, 0.04, 0.2, centerC, roadF)
 		end
 		local cc = if seg % 2 == 0 then curbA else curbB
-		strip(track, i, j, -hw - CURB, -hw, 0.06, 0.5, cc, roadF)
-		strip(track, i, j, hw, hw + CURB, 0.06, 0.5, cc, roadF)
+		strip(track, i, j, -hw - CURB, -hw, 0.06, 0.5, cc, roadF, Enum.Material.Concrete)
+		strip(track, i, j, hw, hw + CURB, 0.06, 0.5, cc, roadF, Enum.Material.Concrete)
 		if wall > CURB + 0.05 then
 			strip(track, i, j, -hw - wall, -hw - CURB, 0.0, 0.5, shoulderC, roadF, Enum.Material.Grass)
 			strip(track, i, j, hw + CURB, hw + wall, 0.0, 0.5, shoulderC, roadF, Enum.Material.Grass)
@@ -633,6 +722,7 @@ function World.build(trackId: string): Built
 
 	-- декор
 	decorate(track, trackId, decoF, groundY)
+	scenery(track, trackId, decoF, groundY, theme)
 
 	-- кристаллы
 	local itemF = Instance.new("Folder")
