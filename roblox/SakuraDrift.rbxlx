@@ -6138,6 +6138,33 @@ return Tracks
     </Properties>
     <Item class="Script" referent="18">
       <Properties>
+        <string name="Name">ErrorRelay</string>
+        <token name="RunContext">0</token>
+        <string name="Source"><![CDATA[--!strict
+-- Диагностика: ошибки и предупреждения сервера складываются в ReplicatedStorage.SakuraServerLog,
+-- чтобы клиентский экран загрузки (Boot) мог показать их игроку. Ни от чего не зависит.
+local LogService = game:GetService("LogService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local log = Instance.new("StringValue")
+log.Name = "SakuraServerLog"
+log.Parent = ReplicatedStorage
+
+local lines: { string } = {}
+LogService.MessageOut:Connect(function(msg: string, kind: Enum.MessageType)
+	if kind == Enum.MessageType.MessageError or kind == Enum.MessageType.MessageWarning then
+		table.insert(lines, string.sub(msg, 1, 300))
+		if #lines > 10 then
+			table.remove(lines, 1)
+		end
+		log.Value = table.concat(lines, "\n")
+	end
+end)
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="Script" referent="19">
+      <Properties>
         <string name="Name">Main</string>
         <token name="RunContext">0</token>
         <string name="Source"><![CDATA[--!strict
@@ -7304,7 +7331,7 @@ end)
 ]]></string>
       </Properties>
     </Item>
-    <Item class="ModuleScript" referent="19">
+    <Item class="ModuleScript" referent="20">
       <Properties>
         <string name="Name">Profiles</string>
         <string name="Source"><![CDATA[--!strict
@@ -7444,21 +7471,21 @@ return Profiles
       </Properties>
     </Item>
   </Item>
-  <Item class="SoundService" referent="20">
+  <Item class="SoundService" referent="21">
     <Properties>
       <string name="Name">SoundService</string>
       <bool name="RespectFilteringEnabled">true</bool>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="21">
+  <Item class="StarterPlayer" referent="22">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="22">
+    <Item class="StarterPlayerScripts" referent="23">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">Audio</string>
           <string name="Source"><![CDATA[--!strict
@@ -7666,7 +7693,103 @@ return Audio
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="LocalScript" referent="25">
+        <Properties>
+          <string name="Name">Boot</string>
+          <string name="Source"><![CDATA[--!strict
+-- Экран загрузки и диагностика: показывает, на каком шаге запуск, и выводит на экран ошибки
+-- клиента и сервера (иначе при сбое виден только пустой мир). Ни от чего не зависит.
+local Players = game:GetService("Players")
+local LogService = game:GetService("LogService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local gui = Instance.new("ScreenGui")
+gui.Name = "SakuraBoot"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.DisplayOrder = 100
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, -40, 0, 60)
+status.Position = UDim2.new(0, 20, 0.5, -30)
+status.BackgroundTransparency = 1
+status.TextColor3 = Color3.new(1, 1, 1)
+status.TextStrokeTransparency = 0
+status.Font = Enum.Font.GothamBold
+status.TextSize = 28
+status.Text = "SAKURA DRIFT — загрузка…"
+status.Parent = gui
+
+local errBox = Instance.new("TextLabel")
+errBox.Size = UDim2.new(1, -40, 0.45, 0)
+errBox.Position = UDim2.new(0, 20, 0.55, 0)
+errBox.BackgroundColor3 = Color3.fromRGB(40, 10, 20)
+errBox.BackgroundTransparency = 0.2
+errBox.TextColor3 = Color3.fromRGB(255, 190, 190)
+errBox.Font = Enum.Font.Code
+errBox.TextSize = 15
+errBox.TextWrapped = true
+errBox.TextXAlignment = Enum.TextXAlignment.Left
+errBox.TextYAlignment = Enum.TextYAlignment.Top
+errBox.Visible = false
+errBox.Parent = gui
+
+local clientLines: { string } = {}
+local serverText = ""
+local function refresh()
+	local parts = {}
+	if #clientLines > 0 then
+		table.insert(parts, "КЛИЕНТ:\n" .. table.concat(clientLines, "\n"))
+	end
+	if serverText ~= "" then
+		table.insert(parts, "СЕРВЕР:\n" .. serverText)
+	end
+	errBox.Text = table.concat(parts, "\n\n")
+	errBox.Visible = #parts > 0
+end
+
+LogService.MessageOut:Connect(function(msg: string, kind: Enum.MessageType)
+	if kind == Enum.MessageType.MessageError or kind == Enum.MessageType.MessageWarning then
+		table.insert(clientLines, string.sub(msg, 1, 300))
+		if #clientLines > 10 then
+			table.remove(clientLines, 1)
+		end
+		refresh()
+	end
+end)
+
+task.spawn(function()
+	local log = ReplicatedStorage:WaitForChild("SakuraServerLog", 20)
+	if log and log:IsA("StringValue") then
+		serverText = log.Value
+		refresh()
+		log.Changed:Connect(function()
+			serverText = log.Value
+			refresh()
+		end)
+	end
+end)
+
+local t0 = os.clock()
+while true do
+	local stage = player:GetAttribute("SakuraStage")
+	if stage == "ok" then
+		status.Visible = false
+		-- ошибки во время игры показываем маленькой плашкой внизу
+		errBox.Size = UDim2.new(0.5, 0, 0.2, 0)
+		errBox.Position = UDim2.new(0, 10, 0.78, 0)
+		errBox.TextSize = 12
+		break
+	end
+	status.Text = string.format("SAKURA DRIFT — загрузка: %s (%d с)", tostring(stage or "старт скриптов"), math.floor(os.clock() - t0))
+	task.wait(0.25)
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">Hud</string>
           <string name="Source"><![CDATA[--!strict
@@ -8485,7 +8608,7 @@ return Hud
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">Input</string>
           <string name="Source"><![CDATA[--!strict
@@ -8601,7 +8724,7 @@ return Input
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">KartModel</string>
           <string name="Source"><![CDATA[--!strict
@@ -8899,13 +9022,17 @@ return KartModel
 ]]></string>
         </Properties>
       </Item>
-      <Item class="LocalScript" referent="27">
+      <Item class="LocalScript" referent="29">
         <Properties>
           <string name="Name">Main</string>
           <string name="Source"><![CDATA[--!strict
 -- Клиент «Sakura Drift»: свой карт считается здесь (Shared/Kart — та же физика, что в веб-версии),
 -- соперники — по снимкам сервера с плавным сглаживанием. Камера, HUD, звук и подбор монет/кристаллов.
 local Players = game:GetService("Players")
+local function stage(name: string)
+	Players.LocalPlayer:SetAttribute("SakuraStage", name)
+end
+stage("общие модули")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
@@ -8918,6 +9045,7 @@ local Bot = require(Shared.Bot)
 local Net = require(Shared.Net)
 local Characters = require(Shared.Characters)
 
+stage("модули клиента")
 local Input = require(script.Parent.Input)
 local Hud = require(script.Parent.Hud)
 local World = require(script.Parent.World)
@@ -8928,6 +9056,7 @@ local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local SC = Config.SCALE
 
+stage("ждём сервер (ремоуты)")
 local RE_State = Net.get("KartState") :: UnreliableRemoteEvent
 local RE_Snap = Net.get("Snapshot") :: UnreliableRemoteEvent
 local RE_Race = Net.get("Race") :: RemoteEvent
@@ -9512,6 +9641,7 @@ end
 
 -- ---------------------------------------------------------------- кнопки гаража
 
+stage("интерфейс")
 Hud.init({
 	buy = function(id: string)
 		local ok, res = pcall(function()
@@ -9540,7 +9670,9 @@ Hud.init({
 })
 
 -- фон лобби
+stage("постройка трассы")
 World.build(Config.TRACK_ORDER[1])
+stage("ok")
 Audio.playMusic("menu")
 RE_Action:FireServer("hello")
 
@@ -9685,7 +9817,7 @@ end)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">World</string>
           <string name="Source"><![CDATA[--!strict

@@ -2,6 +2,10 @@
 -- Клиент «Sakura Drift»: свой карт считается здесь (Shared/Kart — та же физика, что в веб-версии),
 -- соперники — по снимкам сервера с плавным сглаживанием. Камера, HUD, звук и подбор монет/кристаллов.
 local Players = game:GetService("Players")
+local function stage(name: string)
+	Players.LocalPlayer:SetAttribute("SakuraStage", name)
+end
+stage("общие модули")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
@@ -14,6 +18,7 @@ local Bot = require(Shared.Bot)
 local Net = require(Shared.Net)
 local Characters = require(Shared.Characters)
 
+stage("модули клиента")
 local Input = require(script.Parent.Input)
 local Hud = require(script.Parent.Hud)
 local World = require(script.Parent.World)
@@ -24,6 +29,7 @@ local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local SC = Config.SCALE
 
+stage("ждём сервер (ремоуты)")
 local RE_State = Net.get("KartState") :: UnreliableRemoteEvent
 local RE_Snap = Net.get("Snapshot") :: UnreliableRemoteEvent
 local RE_Race = Net.get("Race") :: RemoteEvent
@@ -608,6 +614,7 @@ end
 
 -- ---------------------------------------------------------------- кнопки гаража
 
+stage("интерфейс")
 Hud.init({
 	buy = function(id: string)
 		local ok, res = pcall(function()
@@ -636,7 +643,9 @@ Hud.init({
 })
 
 -- фон лобби
+stage("постройка трассы")
 World.build(Config.TRACK_ORDER[1])
+stage("ok")
 Audio.playMusic("menu")
 RE_Action:FireServer("hello")
 
