@@ -120,7 +120,7 @@ workspace.CurrentCamera.FieldOfView = 70
 workspace.Terrain = newInst("Terrain")
 local RS = game:GetService("ReplicatedStorage")
 -- папка Shared: обращение к модулю по имени даёт ссылку для require
-rawget(RS, "_props").Shared = setmetatable({ __module = "Shared" }, { __index = function(_, k) return { __module = k } end })
+rawget(RS, "_props").Shared = setmetatable({ __module = "Shared" }, { __index = function(_, k) if k == "WaitForChild" then return function(_, c) return { __module = c } end end return { __module = k } end })
 
 __localPlayer = newInst("Player", "Tester")
 __localPlayer.UserId = 1001

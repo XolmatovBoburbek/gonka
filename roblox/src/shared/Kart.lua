@@ -4,7 +4,7 @@
 -- старт на оборотах, монеты, слипстрим, трамплины и трюки, стены, бездорожье, попадания.
 -- Модуль чистый: не трогает мир Роблокса. Им пользуются и клиент (свой карт), и сервер (боты).
 
-local Track = require(script.Parent.Track)
+local Track = require(script.Parent:WaitForChild("Track"))
 
 local Kart = {}
 Kart.__index = Kart

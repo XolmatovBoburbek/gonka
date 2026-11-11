@@ -3,7 +3,7 @@
 -- реактивный шум буста и короткие эффекты. ID берутся из Shared/Config.Sounds; пустой ID — тишина.
 local SoundService = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 
 local Audio = {}
 local SND = Config.Sounds

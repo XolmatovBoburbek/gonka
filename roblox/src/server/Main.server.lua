@@ -7,14 +7,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Config = require(Shared.Config)
-local Tracks = require(Shared.Tracks)
-local Kart = require(Shared.Kart)
-local Bot = require(Shared.Bot)
-local Layout = require(Shared.Layout)
-local Net = require(Shared.Net)
-local Characters = require(Shared.Characters)
-local Profiles = require(script.Parent.Profiles)
+local Config = require(Shared:WaitForChild("Config"))
+local Tracks = require(Shared:WaitForChild("Tracks"))
+local Kart = require(Shared:WaitForChild("Kart"))
+local Bot = require(Shared:WaitForChild("Bot"))
+local Layout = require(Shared:WaitForChild("Layout"))
+local Net = require(Shared:WaitForChild("Net"))
+local Characters = require(Shared:WaitForChild("Characters"))
+local Profiles = require(script.Parent:WaitForChild("Profiles"))
 
 Players.CharacterAutoLoads = false -- в гонке аватар не нужен: камера и карт — свои
 

@@ -1,14 +1,14 @@
 --!strict
 -- Реестр трасс: данные (TrackData) и готовые объекты Track, по одному на трассу.
-local Track = require(script.Parent.Track)
-local folder = script.Parent.TrackData
+local Track = require(script.Parent:WaitForChild("Track"))
+local folder = script.Parent:WaitForChild("TrackData")
 
 local Tracks = {}
 Tracks.data = {
-	sakura = require(folder.Sakura),
-	neon = require(folder.Neon),
-	sunset = require(folder.Sunset),
-	momiji = require(folder.Momiji),
+	sakura = require(folder:WaitForChild("Sakura")),
+	neon = require(folder:WaitForChild("Neon")),
+	sunset = require(folder:WaitForChild("Sunset")),
+	momiji = require(folder:WaitForChild("Momiji")),
 }
 
 local cache = {}

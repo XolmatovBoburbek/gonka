@@ -4,8 +4,8 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 
-local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
-local Characters = require(game:GetService("ReplicatedStorage").Shared.Characters)
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Config"))
+local Characters = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Characters"))
 
 local Profiles = {}
 
@@ -17,7 +17,7 @@ do
 	if ok then
 		store = res
 	else
-		warn("[SakuraDrift] DataStore недоступен, прогресс не сохранится:", res)
+		print("[SakuraDrift] DataStore недоступен (место не опубликовано?), прогресс пока хранится только до выхода:", res)
 	end
 end
 

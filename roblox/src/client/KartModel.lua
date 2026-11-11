@@ -3,7 +3,7 @@
 -- Корень якорный, остальные детали приварены — двигаем одну деталь за кадр.
 -- Эффекты: искры дрифта по уровню, пламя буста, щит, лёд, кручение после попадания, табличка с именем.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 
 local SC = Config.SCALE
 local KartModel = {}

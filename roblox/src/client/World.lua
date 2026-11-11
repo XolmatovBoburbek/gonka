@@ -6,9 +6,9 @@ local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Config = require(Shared.Config)
-local Tracks = require(Shared.Tracks)
-local Layout = require(Shared.Layout)
+local Config = require(Shared:WaitForChild("Config"))
+local Tracks = require(Shared:WaitForChild("Tracks"))
+local Layout = require(Shared:WaitForChild("Layout"))
 
 local SC = Config.SCALE
 local World = {}

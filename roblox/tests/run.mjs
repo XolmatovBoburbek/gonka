@@ -23,8 +23,8 @@ ${fs.readFileSync(path.join(ROOT, 'tests/mock.lua'), 'utf8')}
 local cache = {}
 local function mkScript(name)
   local parent
-  local function node(n) return setmetatable({ __module = n }, { __index = function(_, k) return node(k) end }) end
-  parent = setmetatable({}, { __index = function(_, k) if k == "Parent" then return parent end return node(k) end })
+  local function node(n) return setmetatable({ __module = n }, { __index = function(_, k) if k == "WaitForChild" then return function(_, c) return node(c) end end return node(k) end }) end
+  parent = setmetatable({}, { __index = function(_, k) if k == "Parent" then return parent end if k == "WaitForChild" then return function(_, c) return node(c) end end return node(k) end })
   return { __module = name, Parent = parent }
 end
 __mkScript = mkScript

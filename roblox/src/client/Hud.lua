@@ -8,10 +8,10 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Characters = require(Shared.Characters)
-local Layout = require(Shared.Layout)
-local Kart = require(Shared.Kart)
-local Input = require(script.Parent.Input)
+local Characters = require(Shared:WaitForChild("Characters"))
+local Layout = require(Shared:WaitForChild("Layout"))
+local Kart = require(Shared:WaitForChild("Kart"))
+local Input = require(script.Parent:WaitForChild("Input"))
 
 local Hud = {}
 

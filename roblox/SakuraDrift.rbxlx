@@ -565,7 +565,7 @@ return Config
 -- старт на оборотах, монеты, слипстрим, трамплины и трюки, стены, бездорожье, попадания.
 -- Модуль чистый: не трогает мир Роблокса. Им пользуются и клиент (свой карт), и сервер (боты).
 
-local Track = require(script.Parent.Track)
+local Track = require(script.Parent:WaitForChild("Track"))
 
 local Kart = {}
 Kart.__index = Kart
@@ -6103,15 +6103,15 @@ return {
           <string name="Name">Tracks</string>
           <string name="Source"><![CDATA[--!strict
 -- Реестр трасс: данные (TrackData) и готовые объекты Track, по одному на трассу.
-local Track = require(script.Parent.Track)
-local folder = script.Parent.TrackData
+local Track = require(script.Parent:WaitForChild("Track"))
+local folder = script.Parent:WaitForChild("TrackData")
 
 local Tracks = {}
 Tracks.data = {
-	sakura = require(folder.Sakura),
-	neon = require(folder.Neon),
-	sunset = require(folder.Sunset),
-	momiji = require(folder.Momiji),
+	sakura = require(folder:WaitForChild("Sakura")),
+	neon = require(folder:WaitForChild("Neon")),
+	sunset = require(folder:WaitForChild("Sunset")),
+	momiji = require(folder:WaitForChild("Momiji")),
 }
 
 local cache = {}
@@ -6176,14 +6176,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Config = require(Shared.Config)
-local Tracks = require(Shared.Tracks)
-local Kart = require(Shared.Kart)
-local Bot = require(Shared.Bot)
-local Layout = require(Shared.Layout)
-local Net = require(Shared.Net)
-local Characters = require(Shared.Characters)
-local Profiles = require(script.Parent.Profiles)
+local Config = require(Shared:WaitForChild("Config"))
+local Tracks = require(Shared:WaitForChild("Tracks"))
+local Kart = require(Shared:WaitForChild("Kart"))
+local Bot = require(Shared:WaitForChild("Bot"))
+local Layout = require(Shared:WaitForChild("Layout"))
+local Net = require(Shared:WaitForChild("Net"))
+local Characters = require(Shared:WaitForChild("Characters"))
+local Profiles = require(script.Parent:WaitForChild("Profiles"))
 
 Players.CharacterAutoLoads = false -- в гонке аватар не нужен: камера и карт — свои
 
@@ -7340,8 +7340,8 @@ end)
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 
-local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
-local Characters = require(game:GetService("ReplicatedStorage").Shared.Characters)
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Config"))
+local Characters = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Characters"))
 
 local Profiles = {}
 
@@ -7353,7 +7353,7 @@ do
 	if ok then
 		store = res
 	else
-		warn("[SakuraDrift] DataStore недоступен, прогресс не сохранится:", res)
+		print("[SakuraDrift] DataStore недоступен (место не опубликовано?), прогресс пока хранится только до выхода:", res)
 	end
 end
 
@@ -7493,7 +7493,7 @@ return Profiles
 -- реактивный шум буста и короткие эффекты. ID берутся из Shared/Config.Sounds; пустой ID — тишина.
 local SoundService = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 
 local Audio = {}
 local SND = Config.Sounds
@@ -7802,10 +7802,10 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Characters = require(Shared.Characters)
-local Layout = require(Shared.Layout)
-local Kart = require(Shared.Kart)
-local Input = require(script.Parent.Input)
+local Characters = require(Shared:WaitForChild("Characters"))
+local Layout = require(Shared:WaitForChild("Layout"))
+local Kart = require(Shared:WaitForChild("Kart"))
+local Input = require(script.Parent:WaitForChild("Input"))
 
 local Hud = {}
 
@@ -8732,7 +8732,7 @@ return Input
 -- Корень якорный, остальные детали приварены — двигаем одну деталь за кадр.
 -- Эффекты: искры дрифта по уровню, пламя буста, щит, лёд, кручение после попадания, табличка с именем.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 
 local SC = Config.SCALE
 local KartModel = {}
@@ -9038,19 +9038,19 @@ local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Config = require(Shared.Config)
-local Tracks = require(Shared.Tracks)
-local Kart = require(Shared.Kart)
-local Bot = require(Shared.Bot)
-local Net = require(Shared.Net)
-local Characters = require(Shared.Characters)
+local Config = require(Shared:WaitForChild("Config"))
+local Tracks = require(Shared:WaitForChild("Tracks"))
+local Kart = require(Shared:WaitForChild("Kart"))
+local Bot = require(Shared:WaitForChild("Bot"))
+local Net = require(Shared:WaitForChild("Net"))
+local Characters = require(Shared:WaitForChild("Characters"))
 
 stage("модули клиента")
-local Input = require(script.Parent.Input)
-local Hud = require(script.Parent.Hud)
-local World = require(script.Parent.World)
-local KartModel = require(script.Parent.KartModel)
-local Audio = require(script.Parent.Audio)
+local Input = require(script.Parent:WaitForChild("Input"))
+local Hud = require(script.Parent:WaitForChild("Hud"))
+local World = require(script.Parent:WaitForChild("World"))
+local KartModel = require(script.Parent:WaitForChild("KartModel"))
+local Audio = require(script.Parent:WaitForChild("Audio"))
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -9828,9 +9828,9 @@ local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Config = require(Shared.Config)
-local Tracks = require(Shared.Tracks)
-local Layout = require(Shared.Layout)
+local Config = require(Shared:WaitForChild("Config"))
+local Tracks = require(Shared:WaitForChild("Tracks"))
+local Layout = require(Shared:WaitForChild("Layout"))
 
 local SC = Config.SCALE
 local World = {}
